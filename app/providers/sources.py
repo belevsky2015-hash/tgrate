@@ -8,7 +8,7 @@ SPOT_SYMBOLS = ["TONUSDT", "BTCUSDT", "ETHUSDT", "EURUSDT", "USDCUSDT"]
 
 
 class CexSpot(Provider):
-    """Спот. Binance основной, Bybit и OKX как резерв."""
+    """Спот. Binance основной, Bybit добирает то, чего у него нет."""
 
     name = "cex"
     ttl = 15
@@ -22,7 +22,17 @@ class CexSpot(Provider):
             r.raise_for_status()
             book = {i["symbol"]: i for i in r.json()}
         except Exception:
-            book = await self._bybit(client)
+            book = {}
+
+        # Резерв срабатывал только когда Binance целиком отваливался. Но
+        # символ может просто пропасть из листинга — тогда ответ приходит
+        # успешный, а ключа в нём нет. Добираем недостающее у Bybit.
+        if any(sym not in book for sym in SPOT_SYMBOLS):
+            try:
+                for sym, item in (await self._bybit(client)).items():
+                    book.setdefault(sym, item)
+            except Exception:
+                pass
 
         for sym in SPOT_SYMBOLS:
             item = book.get(sym)
@@ -33,7 +43,7 @@ class CexSpot(Provider):
                 continue
             out[f"cex:{sym}:bid"] = bid
             out[f"cex:{sym}:ask"] = ask
-            out[f"cex:{sym}:bid_inv"] = 1 / ask
+            out[f"cex:{sym}:bid_inv"] = 1 / bid
             out[f"cex:{sym}:ask_inv"] = 1 / ask
             out[f"cex:{sym}:mid"] = (bid + ask) / 2
         return out

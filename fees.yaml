@@ -122,6 +122,14 @@ edges:
     spread_pct: 0.25
     eta_min: 25
 
+  - id: p2p.buy.try
+    src: TRY.BANK
+    dst: USDT.WALLET
+    kind: p2p
+    rate: "wallet:USDT/TRY:ask"
+    fee_pct: "${p2p_fee}"
+    spread_pct: 0.35
+    eta_min: 20
   - id: p2p.sell.try
     src: USDT.WALLET
     dst: TRY.BANK
