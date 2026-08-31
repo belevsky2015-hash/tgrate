@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import asyncio
+import statistics
 import sys
 from pathlib import Path
 
@@ -54,11 +55,15 @@ async def check_wallet() -> bool:
 
     line(OK, f"P2P API работает. Объявлений: SELL {len(sells)}, BUY {len(buys)}")
 
-    top_sell = sum(a.price for a in sells[:5]) / min(5, len(sells))
-    top_buy = sum(a.price for a in buys[:5]) / min(5, len(buys))
+    # Медиана, а не первые пять строк: стороны приходят в разном порядке
+    # (SELL — по возрастанию цены, BUY — без сортировки, с выбросами в
+    # голове выдачи), поэтому сравнение верхушек сравнивает дно одного
+    # стакана с мусором другого и всегда завышает BUY. Сверено 31.08.2026.
+    top_sell = statistics.median([a.price for a in sells])
+    top_buy = statistics.median([a.price for a in buys])
     gap = abs(top_sell / top_buy - 1) * 100
 
-    print(f"      средняя цена по пяти лучшим: SELL {top_sell:.4f}, "
+    print(f"      медиана цены: SELL {top_sell:.4f}, "
           f"BUY {top_buy:.4f}, разница {gap:.2f}%")
 
     if gap < 0.1:

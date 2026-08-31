@@ -16,8 +16,21 @@ rsync -a --exclude .venv --exclude .git --exclude data ./ "$DEST/"
 mkdir -p "$DEST/data"
 chown -R "$USER_NAME:$USER_NAME" "$DEST"
 
-sudo -u "$USER_NAME" python3 -m venv "$DEST/.venv"
-sudo -u "$USER_NAME" "$DEST/.venv/bin/pip" install -q -r "$DEST/requirements.txt"
+# Венв через uv: на этом хосте нет python3-venv (ensurepip недоступен),
+# а uv тащит свой pip внутри себя. Ставим install, а не sync: requirements.txt
+# написан руками, не сгенерирован uv pip compile, и sync не резолвит
+# зависимости — уехали бы starlette и экстры uvicorn[standard].
+UV="$(command -v uv || true)"
+[[ -z "$UV" ]] && UV="/home/$USER_NAME/.local/bin/uv"
+if [[ ! -x "$UV" ]]; then
+  echo "uv не найден ($UV). Поставьте uv или apt install python3.12-venv" >&2
+  exit 1
+fi
+
+rm -rf "$DEST/.venv"
+sudo -u "$USER_NAME" -H "$UV" venv -p /usr/bin/python3 "$DEST/.venv"
+sudo -u "$USER_NAME" -H "$UV" pip install -q --python "$DEST/.venv/bin/python" \
+  -r "$DEST/requirements.txt"
 
 if [[ ! -f "$DEST/.env" ]]; then
   cp "$DEST/.env.example" "$DEST/.env"
