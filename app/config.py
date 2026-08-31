@@ -16,6 +16,29 @@ def _f(key: str, default: float) -> float:
         return default
 
 
+def _payments(raw: str):
+    """
+    WALLET_PAYMENTS в двух формах:
+      "sberbank,tinkoff"                     — один список на все валюты
+      "RUB:sbp,tinkoff;EUR:sepainstant"      — свой список на валюту
+    Вторая нужна потому, что методы оплаты у валют не пересекаются.
+    """
+    raw = raw.strip()
+    if not raw:
+        return []
+    if ":" not in raw:
+        return [p.strip() for p in raw.split(",") if p.strip()]
+    out: dict[str, list[str]] = {}
+    for part in raw.split(";"):
+        if ":" not in part:
+            continue
+        fiat, methods = part.split(":", 1)
+        vals = [m.strip() for m in methods.split(",") if m.strip()]
+        if vals:
+            out[fiat.strip().upper()] = vals
+    return out
+
+
 class Settings:
     fees_path = os.getenv("FEES_PATH", str(ROOT / "fees.yaml"))
     db_path = os.getenv("DB_PATH", str(ROOT / "data" / "deals.sqlite"))
@@ -32,7 +55,7 @@ class Settings:
     wallet_side_buy = os.getenv("WALLET_SIDE_WHEN_BUYING", "SELL")
     wallet_min_execute_rate = _f("WALLET_MIN_EXECUTE_RATE", 0.90)
     wallet_merchants_only = os.getenv("WALLET_MERCHANTS_ONLY", "0") == "1"
-    wallet_payments = [p for p in os.getenv("WALLET_PAYMENTS", "").split(",") if p]
+    wallet_payments = _payments(os.getenv("WALLET_PAYMENTS", ""))
 
     safety_pct = _f("SAFETY_PCT", 0.0)                # общий запас сверху
 

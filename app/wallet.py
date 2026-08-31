@@ -117,7 +117,14 @@ class WalletP2P:
         self.side_sell = "BUY" if side_when_we_buy == "SELL" else "SELL"
         self.min_execute_rate = min_execute_rate
         self.merchants_only = merchants_only
-        self.payments = [p.lower() for p in (payments or [])]
+        # Методы оплаты: либо плоский список на все валюты (как раньше),
+        # либо словарь {"EUR": [...], "RUB": [...]}. Ключ "*" — умолчание.
+        # Одним списком на всё пользоваться нельзя: SEPA есть только у евро,
+        # СБП только у рублей, и общий фильтр убивает одну из ног маршрута.
+        if isinstance(payments, dict):
+            self.payments = {k.upper(): [p.lower() for p in v] for k, v in payments.items()}
+        else:
+            self.payments = {"*": [p.lower() for p in (payments or [])]}
         self.ttl = ttl
         self._cache: dict[tuple, tuple[float, list[Ad]]] = {}
         self._lock = asyncio.Lock()
@@ -187,7 +194,14 @@ class WalletP2P:
                 log.warning("Wallet P2P %s/%s %s: %s", crypto, fiat, side, exc)
                 return hit[1] if hit else []
 
-    def _usable(self, ads: list[Ad], fiat_amount: float) -> list[Ad]:
+    def _payments_for(self, fiat: str | None) -> list[str]:
+        if fiat and fiat.upper() in self.payments:
+            return self.payments[fiat.upper()]
+        return self.payments.get("*", [])
+
+    def _usable(self, ads: list[Ad], fiat_amount: float,
+                fiat: str | None = None) -> list[Ad]:
+        allowed = self._payments_for(fiat)
         out = []
         for a in ads:
             if a.execute_rate < self.min_execute_rate:
@@ -196,7 +210,7 @@ class WalletP2P:
                 continue
             if self.merchants_only and a.merchant_level != "MERCHANT":
                 continue
-            if self.payments and not set(a.payments) & set(self.payments):
+            if allowed and not set(a.payments) & set(allowed):
                 continue
             if fiat_amount and not a.fits(fiat_amount):
                 # объявление не покрывает нашу сумму целиком, но может
@@ -226,7 +240,7 @@ class WalletP2P:
             return None
 
         # цену сортируем в нашу пользу: покупаем дешевле, продаём дороже
-        pool = self._usable(raw, 0)
+        pool = self._usable(raw, 0, fiat)
         pool.sort(key=lambda a: a.price, reverse=(direction == "sell"))
 
         left, cost, got, used = crypto_amount, 0.0, 0.0, 0
