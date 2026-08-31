@@ -227,6 +227,9 @@ async function drawChart(){
     range > 48 ? {day:'numeric', month:'short'} : {hour:'2-digit', minute:'2-digit'});
   const d = ys[0] < 1 ? 6 : 4;
   const chg = h.change_pct ?? 0;
+  // на коротком окне курс двигается в четвёртом знаке процента —
+  // округление до сотых показывало бы ровный ноль
+  const chgTxt = Math.abs(chg) < 0.01 ? chg.toFixed(4) : nf(chg, 2);
 
   el.innerHTML = head + `
     <svg viewBox="0 0 ${W} ${HH}" preserveAspectRatio="none" role="img"
@@ -241,7 +244,7 @@ async function drawChart(){
     </div>
     <div class="cap">
       <span>сейчас <b>${nf(ys[ys.length-1],d)}</b></span>
-      <span>${chg > 0 ? '+' : ''}${chg}% за период</span>
+      <span>${chg > 0 ? '+' : ''}${chgTxt}% за период</span>
     </div>
     <p class="hint">${h.note}</p>`;
   bind();

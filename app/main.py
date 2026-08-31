@@ -209,7 +209,7 @@ def history(src: str, dst: str, amount: float = 1000.0, hours: float = 24):
     return {
         "src": src, "dst": dst, "amount": amount, "hours": hours,
         "points": points,
-        "change_pct": round((last_p / first - 1) * 100, 2) if points and first else None,
+        "change_pct": round((last_p / first - 1) * 100, 4) if points and first else None,
         "note": "цены срезов — VWAP на 1000 USDT",
     }
 
