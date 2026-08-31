@@ -145,6 +145,19 @@ const H = {'Content-Type':'application/json', ...(TOKEN?{'X-Token':TOKEN}:{})};
 const $ = s => document.querySelector(s);
 let nodes = [], last = null;
 
+// Консоли на телефоне нет — любой сбой должен быть виден на странице
+function showErr(msg){
+  const el = document.querySelector('#out');
+  if (!el) return;
+  // textContent, а не innerHTML: в msg приходит текст ошибки с сервера
+  const d = document.createElement('div');
+  d.className = 'note warn';
+  d.textContent = 'Сбой в панели: ' + msg;
+  el.replaceChildren(d);
+}
+addEventListener('error', e => showErr(e.message));
+addEventListener('unhandledrejection', e => showErr((e.reason && e.reason.message) || e.reason));
+
 const nf = (v,d=2) => Number(v).toLocaleString('ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d});
 const short = id => (nodes.find(n=>n.id===id)||{}).title || id;
 
@@ -185,6 +198,7 @@ $('#f').onsubmit = async ev => {
     if (matchMedia('(max-width:800px)').matches)
       $('#out').scrollIntoView({behavior:'smooth', block:'start'});
     loadStatus();
+  } catch(err){ showErr(err.message || err);
   } finally { $('#go').textContent = 'Посчитать'; $('#go').disabled = false; }
 };
 
@@ -321,7 +335,7 @@ function render(d){
   };
 }
 
-boot();
+boot().catch(err => showErr('не удалось загрузить список точек: ' + (err.message || err)));
 </script>
 </body>
 </html>
