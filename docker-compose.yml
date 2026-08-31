@@ -1,0 +1,18 @@
+services:
+  api:
+    build: .
+    env_file: .env
+    # Наружу не публикуем: только на localhost, дальше через nginx.
+    ports: ["127.0.0.1:8080:8080"]
+    volumes: ["./data:/app/data"]
+    restart: unless-stopped
+
+  bot:
+    build: .
+    env_file: .env
+    environment:
+      API_BASE: http://api:8080
+    command: ["python", "-m", "app.userbot"]
+    volumes: ["./data:/app/data"]
+    depends_on: [api]
+    restart: unless-stopped

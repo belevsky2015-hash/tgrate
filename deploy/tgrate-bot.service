@@ -1,0 +1,22 @@
+[Unit]
+Description=Курс через Telegram Wallet — юзербот
+After=network-online.target tgrate-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/opt/tgrate
+EnvironmentFile=/opt/tgrate/.env
+ExecStart=/opt/tgrate/.venv/bin/python -m app.userbot
+Restart=always
+RestartSec=15
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/tgrate/data
+
+[Install]
+WantedBy=multi-user.target

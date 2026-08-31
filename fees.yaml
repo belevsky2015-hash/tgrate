@@ -1,0 +1,294 @@
+# ---------------------------------------------------------------------------
+# Граф операций Telegram Wallet.
+# Комиссии сверены с help.ru.wallet.tg (обновление 19.08.2026).
+#
+# ${exchange_fee} — 0,9% на Базовом тарифе, 0,09% на Трейдере. Подставляется
+# из WALLET_TIER в .env. ${p2p_fee} — 0,9% если вы мейкер, 0 если тейкер.
+# ---------------------------------------------------------------------------
+
+nodes:
+  RUB.BANK:    {asset: RUB,  title: "Рубли на карте или СБП"}
+  KZT.BANK:    {asset: KZT,  title: "Тенге на карте"}
+  UAH.BANK:    {asset: UAH,  title: "Гривна на карте"}
+  USD.BANK:    {asset: USD,  title: "Доллары на счёте"}
+  EUR.BANK:    {asset: EUR,  title: "Евро на счёте"}
+  TRY.BANK:    {asset: TRY,  title: "Лира на карте"}
+
+  USDT.WALLET: {asset: USDT, title: "USDT в Кошельке"}
+  GRAM.WALLET: {asset: GRAM, title: "GRAM в Кошельке"}
+  BTC.WALLET:  {asset: BTC,  title: "BTC в Кошельке"}
+  USDC.WALLET: {asset: USDC, title: "USDC в Кошельке"}
+
+  USDT.TON:    {asset: USDT, title: "USDT в сети TON"}
+  USDT.TRC20:  {asset: USDT, title: "USDT в сети TRON"}
+  USDT.SOL:    {asset: USDT, title: "USDT в сети Solana"}
+  USDT.ETH:    {asset: USDT, title: "USDT в сети Ethereum"}
+  GRAM.CHAIN:  {asset: GRAM, title: "GRAM в сети TON"}
+  BTC.CHAIN:   {asset: BTC,  title: "BTC в сети Bitcoin"}
+  USDT.TG:     {asset: USDT, title: "USDT у контакта в Telegram"}
+
+edges:
+
+  # === P2P Маркет: единственный способ зайти и выйти в фиат без 3,5% ======
+  # Комиссия 0,9% списывается ТОЛЬКО с мейкера. Откликаясь на чужое
+  # объявление, вы тейкер и не платите ничего — но берёте худшую цену.
+
+  - id: p2p.buy.rub
+    src: RUB.BANK
+    dst: USDT.WALLET
+    kind: p2p
+    rate: "wallet:USDT/RUB:ask"
+    fee_pct: "${p2p_fee}"
+    spread_pct: 0.25
+    min: 500
+    eta_min: 12
+    note: "Покупка USDT за рубли. Цена — VWAP по стакану на вашу сумму."
+
+  - id: p2p.sell.rub
+    src: USDT.WALLET
+    dst: RUB.BANK
+    kind: p2p
+    rate: "wallet:USDT/RUB:bid"
+    fee_pct: "${p2p_fee}"
+    spread_pct: 0.25
+    min: 5
+    eta_min: 12
+
+  - id: p2p.buy.kzt
+    src: KZT.BANK
+    dst: USDT.WALLET
+    kind: p2p
+    rate: "wallet:USDT/KZT:ask"
+    fee_pct: "${p2p_fee}"
+    spread_pct: 0.35
+    eta_min: 15
+  - id: p2p.sell.kzt
+    src: USDT.WALLET
+    dst: KZT.BANK
+    kind: p2p
+    rate: "wallet:USDT/KZT:bid"
+    fee_pct: "${p2p_fee}"
+    spread_pct: 0.35
+    eta_min: 15
+
+  - id: p2p.buy.uah
+    src: UAH.BANK
+    dst: USDT.WALLET
+    kind: p2p
+    rate: "wallet:USDT/UAH:ask"
+    fee_pct: "${p2p_fee}"
+    spread_pct: 0.4
+    eta_min: 18
+  - id: p2p.sell.uah
+    src: USDT.WALLET
+    dst: UAH.BANK
+    kind: p2p
+    rate: "wallet:USDT/UAH:bid"
+    fee_pct: "${p2p_fee}"
+    spread_pct: 0.4
+    eta_min: 18
+
+  - id: p2p.buy.usd
+    src: USD.BANK
+    dst: USDT.WALLET
+    kind: p2p
+    rate: "wallet:USDT/USD:ask"
+    fee_pct: "${p2p_fee}"
+    spread_pct: 0.2
+    eta_min: 20
+  - id: p2p.sell.usd
+    src: USDT.WALLET
+    dst: USD.BANK
+    kind: p2p
+    rate: "wallet:USDT/USD:bid"
+    fee_pct: "${p2p_fee}"
+    spread_pct: 0.2
+    eta_min: 20
+
+  - id: p2p.buy.eur
+    src: EUR.BANK
+    dst: USDT.WALLET
+    kind: p2p
+    rate: "wallet:USDT/EUR:ask"
+    fee_pct: "${p2p_fee}"
+    spread_pct: 0.25
+    eta_min: 25
+  - id: p2p.sell.eur
+    src: USDT.WALLET
+    dst: EUR.BANK
+    kind: p2p
+    rate: "wallet:USDT/EUR:bid"
+    fee_pct: "${p2p_fee}"
+    spread_pct: 0.25
+    eta_min: 25
+
+  - id: p2p.sell.try
+    src: USDT.WALLET
+    dst: TRY.BANK
+    kind: p2p
+    rate: "wallet:USDT/TRY:bid"
+    fee_pct: "${p2p_fee}"
+    spread_pct: 0.35
+    eta_min: 20
+
+  # === Внутренний обмен ====================================================
+  # Курс берётся Кошельком с нескольких бирж. Комиссия по тарифу.
+  # Лимиты: 1,4–25 000 $, пары с BTC от 3,1 $, USDT–GRAM до 100 000 $.
+
+  - id: swap.usdt.gram
+    src: USDT.WALLET
+    dst: GRAM.WALLET
+    kind: swap
+    rate: "cex:TONUSDT:ask_inv"
+    fee_pct: "${exchange_fee}"
+    spread_pct: 0.15
+    min: 1.4
+    max: 100000
+    eta_min: 1
+  - id: swap.gram.usdt
+    src: GRAM.WALLET
+    dst: USDT.WALLET
+    kind: swap
+    rate: "cex:TONUSDT:bid"
+    fee_pct: "${exchange_fee}"
+    spread_pct: 0.15
+    eta_min: 1
+
+  - id: swap.usdt.btc
+    src: USDT.WALLET
+    dst: BTC.WALLET
+    kind: swap
+    rate: "cex:BTCUSDT:ask_inv"
+    fee_pct: "${exchange_fee}"
+    spread_pct: 0.2
+    min: 3.1
+    max: 25000
+    eta_min: 1
+  - id: swap.btc.usdt
+    src: BTC.WALLET
+    dst: USDT.WALLET
+    kind: swap
+    rate: "cex:BTCUSDT:bid"
+    fee_pct: "${exchange_fee}"
+    spread_pct: 0.2
+    eta_min: 1
+
+  # === Вывод на внешний адрес =============================================
+  # Комиссия фиксированная и от суммы не зависит. На 100 $ вывод в TRON
+  # съедает 3,5% — это дороже любой другой части схемы.
+
+  - id: out.usdt.ton
+    src: USDT.WALLET
+    dst: USDT.TON
+    kind: withdraw
+    rate: 1.0
+    fee_dst: 1.0
+    min: 1
+    eta_min: 2
+  - id: out.usdt.trc20
+    src: USDT.WALLET
+    dst: USDT.TRC20
+    kind: withdraw
+    rate: 1.0
+    fee_dst: 3.5
+    min: 1
+    eta_min: 5
+    note: "Самый дорогой вывод. Оправдан только если получатель принимает лишь TRON."
+  - id: out.usdt.sol
+    src: USDT.WALLET
+    dst: USDT.SOL
+    kind: withdraw
+    rate: 1.0
+    fee_dst: 1.5
+    min: 1
+    eta_min: 2
+  - id: out.usdt.eth
+    src: USDT.WALLET
+    dst: USDT.ETH
+    kind: withdraw
+    rate: 1.0
+    fee_dst: 4.0
+    min: 1
+    eta_min: 10
+  - id: out.gram
+    src: GRAM.WALLET
+    dst: GRAM.CHAIN
+    kind: withdraw
+    rate: 1.0
+    fee_dst: 0.05
+    min: 0.1
+    eta_min: 2
+  - id: out.btc
+    src: BTC.WALLET
+    dst: BTC.CHAIN
+    kind: withdraw
+    rate: 1.0
+    fee_dst: 0.00008
+    min: 0.0001
+    eta_min: 30
+    note: "Комиссия плавающая, растёт при загрузке сети."
+
+  # === Пополнение =========================================================
+  # Комиссии нет. Есть минимумы, ниже которых средства не зачислятся.
+
+  - id: in.usdt.ton
+    src: USDT.TON
+    dst: USDT.WALLET
+    kind: deposit
+    rate: 1.0
+    min: 0.01
+    eta_min: 2
+  - id: in.usdt.trc20
+    src: USDT.TRC20
+    dst: USDT.WALLET
+    kind: deposit
+    rate: 1.0
+    min: 0.003
+    eta_min: 5
+  - id: in.gram
+    src: GRAM.CHAIN
+    dst: GRAM.WALLET
+    kind: deposit
+    rate: 1.0
+    min: 0.01
+    eta_min: 2
+  - id: in.btc
+    src: BTC.CHAIN
+    dst: BTC.WALLET
+    kind: deposit
+    rate: 1.0
+    eta_min: 40
+
+  # === Перевод контакту в Telegram ========================================
+  # Ноль комиссии, мгновенно, сеть выбирать не нужно. Лучший способ
+  # передать деньги другому пользователю Кошелька.
+
+  - id: send.contact.usdt
+    src: USDT.WALLET
+    dst: USDT.TG
+    kind: transfer
+    rate: 1.0
+    min: 0.01
+    eta_min: 0
+    note: "Бесплатно. Если получатель тоже в Wallet — не выводите в сеть."
+
+  # === Карта через платёжного партнёра ====================================
+  # Только как ориентир: почти всегда хуже P2P.
+
+  - id: card.sell.rub
+    src: USDT.WALLET
+    dst: RUB.BANK
+    kind: offramp
+    rate: "fiat:USD/RUB:bid"
+    fee_pct: 3.5
+    eta_min: 30
+    note: "Сторонний провайдер, 3,5%. Доступен не во всех странах."
+  - id: card.buy.rub
+    src: RUB.BANK
+    dst: USDT.WALLET
+    kind: onramp
+    rate: "fiat:USD/RUB:ask"
+    fee_pct: 0.0
+    max: 30000
+    eta_min: 10
+    note: "USDT с карты без комиссии до 300 € на Базовом, 10 000 € на Трейдере."

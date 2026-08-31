@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Курс через Telegram Wallet</title>
+<style>
+:root{
+  --paper:#F1F3F0; --ink:#16202A; --rule:#C6CFCB; --soft:#6C7A80;
+  --credit:#0B6E4F; --debit:#A93A2C; --field:#FFFFFF;
+  --num:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:400 16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+.wrap{max-width:1020px;margin:0 auto;padding:28px 20px 80px}
+h1{font-size:20px;font-weight:600;margin:0 0 2px;letter-spacing:-.01em}
+.sub{color:var(--soft);font-size:14px;margin:0 0 24px}
+.cols{display:grid;grid-template-columns:320px 1fr;gap:32px;align-items:start}
+@media(max-width:800px){.cols{grid-template-columns:1fr;gap:24px}}
+
+label{display:block;font-size:13px;color:var(--soft);margin:14px 0 5px}
+select,input{width:100%;padding:9px 11px;border:1px solid var(--rule);
+  border-radius:5px;background:var(--field);color:var(--ink);font-size:15px}
+input[type=number]{font-family:var(--num);font-variant-numeric:tabular-nums}
+select:focus,input:focus{outline:2px solid var(--credit);outline-offset:1px;border-color:transparent}
+button{margin-top:18px;width:100%;padding:11px;border:0;border-radius:5px;
+  background:var(--ink);color:var(--paper);font-size:15px;font-weight:500;cursor:pointer}
+button:hover{background:#22303C}
+button.ghost{background:none;color:var(--soft);border:1px solid var(--rule);margin-top:8px}
+.swap{margin:10px 0 0;font-size:13px;color:var(--credit);background:none;border:0;
+  padding:0;width:auto;cursor:pointer;text-decoration:underline}
+
+.result{border-top:2px solid var(--ink);padding-top:18px}
+.big{font-family:var(--num);font-variant-numeric:tabular-nums;
+  font-size:clamp(30px,7vw,48px);font-weight:500;letter-spacing:-.02em;line-height:1.05}
+.big .unit{font-size:.42em;color:var(--soft);margin-left:8px;letter-spacing:0}
+.meta{color:var(--soft);font-size:14px;margin-top:8px}
+.meta b{font-family:var(--num);color:var(--ink);font-weight:500}
+
+.ladder{margin-top:26px;border-top:1px solid var(--rule)}
+.step{display:grid;grid-template-columns:22px 1fr auto;gap:12px;
+  padding:13px 0;border-bottom:1px solid var(--rule);align-items:baseline}
+.idx{font-family:var(--num);font-size:13px;color:var(--soft)}
+.path{font-size:15px}
+.hint{font-size:13px;color:var(--soft);margin-top:3px}
+.amt{font-family:var(--num);font-variant-numeric:tabular-nums;font-size:15px;text-align:right;white-space:nowrap}
+.cut{display:block;font-size:12.5px;color:var(--debit);margin-top:3px}
+.bar{height:3px;background:var(--debit);opacity:.5;margin-top:6px;border-radius:2px}
+
+.alts{margin-top:26px}
+.alt{display:flex;justify-content:space-between;gap:12px;padding:10px 0;
+  border-bottom:1px solid var(--rule);font-size:14px;cursor:pointer}
+.alt span:last-child{font-family:var(--num);color:var(--debit);white-space:nowrap}
+.alt:hover{color:var(--credit)}
+
+.note{background:#E6EAE5;border-left:3px solid var(--soft);padding:11px 14px;
+  font-size:13.5px;color:#42525A;border-radius:0 5px 5px 0;margin-top:20px}
+.note.warn{border-left-color:var(--debit)}
+h2{font-size:14px;font-weight:600;margin:30px 0 4px}
+.grid{display:grid;grid-template-columns:1fr auto;gap:6px 14px;font-size:13.5px;
+  color:var(--soft);margin-top:8px}
+.grid b{font-family:var(--num);font-weight:500;color:var(--ink)}
+.fact{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:10px}
+.fact input{margin:0}.fact button{margin:0;width:auto;padding:9px 18px}
+.empty{color:var(--soft);font-size:15px;padding:40px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Курс через Telegram Wallet</h1>
+  <p class="sub">Считает по стакану P2P Маркета на вашу сумму, с комиссиями обмена и вывода.</p>
+
+  <div class="cols">
+    <form id="f">
+      <label for="src">Откуда</label>
+      <select id="src"></select>
+      <button type="button" class="swap" id="swap">поменять местами</button>
+
+      <label for="dst">Куда</label>
+      <select id="dst"></select>
+
+      <label for="amt">Сумма</label>
+      <input id="amt" type="number" step="any" value="50000" min="0">
+
+      <button type="submit" id="go">Посчитать</button>
+      <button type="button" class="ghost" id="refresh">Обновить котировки</button>
+
+      <h2>Настройки расчёта</h2>
+      <div class="grid" id="cfg"></div>
+    </form>
+
+    <main>
+      <div id="out"><p class="empty">Выберите направление и сумму — покажу итог и где по дороге теряются деньги.</p></div>
+    </main>
+  </div>
+</div>
+
+<script>
+const TOKEN = localStorage.getItem('panel_token') || '';
+const H = {'Content-Type':'application/json', ...(TOKEN?{'X-Token':TOKEN}:{})};
+const $ = s => document.querySelector(s);
+let nodes = [], last = null;
+
+const nf = (v,d=2) => Number(v).toLocaleString('ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d});
+const short = id => (nodes.find(n=>n.id===id)||{}).title || id;
+
+async function boot(){
+  nodes = await (await fetch('/api/nodes',{headers:H})).json();
+  for (const sel of ['#src','#dst']){
+    $(sel).innerHTML = nodes.map(n=>`<option value="${n.id}">${n.title}</option>`).join('');
+  }
+  $('#src').value = 'RUB.BANK';
+  $('#dst').value = 'USDT.WALLET';
+  loadStatus();
+}
+
+async function loadStatus(){
+  const s = await (await fetch('/api/status',{headers:H})).json();
+  const a = s.accuracy;
+  $('#cfg').innerHTML = `
+    <span>Тариф Кошелька</span><b>${s.tier==='trader'?'Трейдер':'Базовый'}</b>
+    <span>Комиссия обмена</span><b>${s.exchange_fee_pct}%</b>
+    <span>Роль на P2P</span><b>${s.role==='maker'?'мейкер':'тейкер'} · ${s.p2p_fee_pct}%</b>
+    <span>Котировки</span><b>${s.quotes.age_sec ?? '—'} с назад</b>
+    <span>Ошибка прогноза</span><b>${a.deals ? a.mae_pct+'%' : 'нет данных'}</b>`;
+}
+
+$('#swap').onclick = () => {
+  const a = $('#src').value; $('#src').value = $('#dst').value; $('#dst').value = a;
+};
+$('#refresh').onclick = async () => { await loadStatus(); $('#f').requestSubmit(); };
+
+$('#f').onsubmit = async ev => {
+  ev.preventDefault();
+  $('#go').textContent = 'Считаю…'; $('#go').disabled = true;
+  try{
+    const body = {src:$('#src').value, dst:$('#dst').value, amount:parseFloat($('#amt').value), routes:4};
+    const r = await fetch('/api/quote',{method:'POST',headers:H,body:JSON.stringify(body)});
+    if(!r.ok){ $('#out').innerHTML = `<div class="note warn">${(await r.json()).detail}</div>`; return; }
+    last = await r.json(); render(last);
+    loadStatus();
+  } finally { $('#go').textContent = 'Посчитать'; $('#go').disabled = false; }
+};
+
+function render(d){
+  const b = d.best, req = d.request;
+  const worst = Math.max(...b.steps.map(s=>s.loss_pct), 0.01);
+
+  const steps = b.steps.map((s,i)=>`
+    <div class="step">
+      <div class="idx">${i+1}</div>
+      <div>
+        <div class="path">${short(s.from)} → ${short(s.to)}</div>
+        ${s.note?`<div class="hint">${s.note}</div>`:''}
+        <div class="bar" style="width:${Math.max(2,(s.loss_pct/worst)*100)}%"></div>
+      </div>
+      <div class="amt">${nf(s.out, s.out<10?4:2)}
+        <span class="cut">−${nf(s.loss_pct,2)}%</span>
+      </div>
+    </div>`).join('');
+
+  const alts = (d.alternatives||[]).map(a=>`
+    <div class="alt" title="${a.key}">
+      <span>${a.steps.map(s=>short(s.to)).join(' → ')}</span>
+      <span>${nf(a.amount_out,2)} · ${nf((a.amount_out/b.amount_out-1)*100,2)}%</span>
+    </div>`).join('');
+
+  const c = b.calibration;
+  const calibLine = c.deals
+    ? `Поправка по ${c.deals} реальным сделкам (${c.basis}): ×${c.factor}`
+    : `Поправки нет — по этому маршруту ещё не записано ни одной реальной сделки, так что цифра держится только на модели комиссий.`;
+
+  $('#out').innerHTML = `
+    <div class="result">
+      <div class="big">${nf(b.amount_out, b.amount_out<10?4:2)}<span class="unit">${short(req.dst)}</span></div>
+      <p class="meta">
+        За ${nf(req.amount,2)} ${short(req.src)} · курс <b>${nf(b.effective_rate, b.effective_rate<1?6:4)}</b>
+        · около <b>${b.eta_min}</b> мин
+        ${b.total_loss_pct!==null?`<br>Вся цепочка съедает <b>${nf(b.total_loss_pct,2)}%</b> относительно прямого курса P2P`:''}
+      </p>
+    </div>
+
+    <div class="ladder">${steps}</div>
+
+    ${alts?`<div class="alts"><h2>Другие маршруты</h2>${alts}</div>`:''}
+
+    <div class="note ${c.deals?'':'warn'}">${calibLine}</div>
+
+    ${d.missing_quotes.length?`<div class="note warn">Не пришли котировки: ${d.missing_quotes.join(', ')}. Маршруты через них исключены.</div>`:''}
+
+    <h2>Записать реальный результат</h2>
+    <p class="sub" style="margin:2px 0 0">Сколько пришло на самом деле. Каждая запись подтягивает следующие расчёты ближе к факту.</p>
+    <div class="fact">
+      <input id="actual" type="number" step="any" placeholder="Получено ${short(req.dst)}">
+      <button id="save">Сохранить</button>
+    </div>`;
+
+  $('#save').onclick = async () => {
+    const v = parseFloat($('#actual').value);
+    if(!v) return;
+    const r = await fetch('/api/deals',{method:'POST',headers:H,body:JSON.stringify({
+      route_key:b.key, pair:`${req.src}>${req.dst}`, amount_in:req.amount,
+      predicted_out:b.amount_out, actual_out:v
+    })});
+    const res = await r.json();
+    $('#save').textContent = `Разошлось на ${res.error_pct>0?'+':''}${res.error_pct}%`;
+    loadStatus();
+  };
+}
+
+boot();
+</script>
+</body>
+</html>
