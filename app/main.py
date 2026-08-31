@@ -13,6 +13,7 @@ from . import wallet as W
 from .calibration import Calibrator
 from .config import settings
 from .graph import bind_rates, k_best_routes, load_graph, reachable_nodes
+from .history import History
 from .models import Unreachable
 from .quotes import QuoteBook
 
@@ -29,6 +30,7 @@ book = QuoteBook(
     payments=settings.wallet_payments,
 )
 calib = Calibrator(settings.db_path)
+hist = History(settings.db_path)
 
 VARS = {
     "exchange_fee": W.exchange_fee(settings.wallet_tier),
@@ -58,6 +60,7 @@ async def _loop():
     while True:
         try:
             await book.refresh(depth_usdt=1000)
+            hist.record(book.last)
         except Exception as exc:
             log.warning("Обновление котировок не удалось: %s", exc)
         await asyncio.sleep(30)   # P2P API Wallet обновляется раз в 30 сек
@@ -180,6 +183,35 @@ class DealIn(BaseModel):
     predicted_out: float
     actual_out: float
     comment: str = ""
+
+
+@app.get("/api/history", dependencies=[Depends(auth)])
+def history(src: str, dst: str, amount: float = 1000.0, hours: float = 24):
+    """
+    Курс направления по сохранённым срезам котировок.
+
+    Граф собирается свой на каждый запрос: EDGES общий на процесс, а
+    bind_rates его мутирует — привязка старых котировок затёрла бы
+    текущие прямо под носом у параллельного /api/quote.
+    """
+    _, edges = load_graph(settings.fees_path, VARS)
+    points = []
+    for ts, rates in hist.snapshots(hours):
+        bind_rates(edges, rates)
+        try:
+            routes = k_best_routes(edges, src, dst, amount, k=1)
+        except Unreachable:
+            continue
+        if routes:
+            points.append({"t": round(ts), "rate": routes[0].amount_out / amount})
+
+    first, last_p = (points[0]["rate"], points[-1]["rate"]) if points else (None, None)
+    return {
+        "src": src, "dst": dst, "amount": amount, "hours": hours,
+        "points": points,
+        "change_pct": round((last_p / first - 1) * 100, 2) if points and first else None,
+        "note": "цены срезов — VWAP на 1000 USDT",
+    }
 
 
 @app.post("/api/deals", dependencies=[Depends(auth)])

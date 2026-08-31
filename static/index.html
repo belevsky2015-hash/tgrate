@@ -93,6 +93,18 @@ h2{font-size:14px;font-weight:600;margin:30px 0 4px}
 .grid b{font-family:var(--num);font-weight:500;color:var(--ink)}
 .fact{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:10px}
 .fact input{margin:0}.fact button{margin:0;width:auto;padding:0 18px}
+.chart{margin-top:26px}
+.chart svg{width:100%;height:170px;display:block}
+.chart .line{fill:none;stroke:var(--credit);stroke-width:2;vector-effect:non-scaling-stroke;
+  stroke-linejoin:round;stroke-linecap:round}
+.chart .area{fill:var(--credit);opacity:.10}
+.range{display:flex;gap:8px;margin:10px 0}
+.range button{margin:0;width:auto;flex:1;min-height:var(--tap);font-size:14px;font-weight:400;
+  background:none;color:var(--soft);border:1px solid var(--rule)}
+.range button[aria-pressed=true]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.cap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;
+  font-size:13px;color:var(--soft);margin-top:6px}
+.cap b{font-family:var(--num);font-variant-numeric:tabular-nums;color:var(--ink);font-weight:500}
 .empty{color:var(--soft);font-size:15px;padding:40px 0}
 </style>
 </head>
@@ -176,6 +188,65 @@ $('#f').onsubmit = async ev => {
   } finally { $('#go').textContent = 'Посчитать'; $('#go').disabled = false; }
 };
 
+
+let range = 24;
+
+async function drawChart(){
+  const el = $('#chart');
+  if(!el || !last) return;
+  const req = last.request;
+  const btns = [[6,'6 ч'],[24,'сутки'],[168,'неделя']].map(([v,t]) =>
+    `<button type="button" data-h="${v}" aria-pressed="${v===range}">${t}</button>`).join('');
+  const head = `<h2>Курс ${short(req.src)} → ${short(req.dst)}</h2><div class="range">${btns}</div>`;
+
+  const bind = () => el.querySelectorAll('.range button').forEach(b => {
+    b.onclick = () => { range = +b.dataset.h; drawChart(); };
+  });
+
+  let h;
+  try{
+    h = await (await fetch(`/api/history?src=${req.src}&dst=${req.dst}`
+      + `&amount=${req.amount}&hours=${range}`, {headers:H})).json();
+  }catch(e){ el.innerHTML = head; bind(); return; }
+
+  const pts = h.points || [];
+  if(pts.length < 2){
+    el.innerHTML = head + `<p class="hint">История копится с момента запуска панели.
+      Первые точки появятся через пару минут, за неделю график наберётся сам.</p>`;
+    bind(); return;
+  }
+
+  const W = 600, HH = 170, P = 6;
+  const ys = pts.map(p => p.rate);
+  const lo = Math.min(...ys), hi = Math.max(...ys), span = (hi - lo) || hi || 1;
+  const x = i => P + i * (W - 2*P) / (pts.length - 1);
+  const y = v => P + (1 - (v - lo) / span) * (HH - 2*P);
+  const line = pts.map((p,i) => `${i?'L':'M'}${x(i).toFixed(1)},${y(p.rate).toFixed(1)}`).join('');
+  const area = `${line}L${x(pts.length-1).toFixed(1)},${HH}L${x(0).toFixed(1)},${HH}Z`;
+  const fmt = t => new Date(t*1000).toLocaleString('ru-RU',
+    range > 48 ? {day:'numeric', month:'short'} : {hour:'2-digit', minute:'2-digit'});
+  const d = ys[0] < 1 ? 6 : 4;
+  const chg = h.change_pct ?? 0;
+
+  el.innerHTML = head + `
+    <svg viewBox="0 0 ${W} ${HH}" preserveAspectRatio="none" role="img"
+         aria-label="Курс ${short(req.src)} → ${short(req.dst)}, изменение ${chg}% за период">
+      <path class="area" d="${area}"></path>
+      <path class="line" d="${line}"></path>
+    </svg>
+    <div class="cap">
+      <span>${fmt(pts[0].t)}</span>
+      <span>мин <b>${nf(lo,d)}</b> · макс <b>${nf(hi,d)}</b></span>
+      <span>${fmt(pts[pts.length-1].t)}</span>
+    </div>
+    <div class="cap">
+      <span>сейчас <b>${nf(ys[ys.length-1],d)}</b></span>
+      <span>${chg > 0 ? '+' : ''}${chg}% за период</span>
+    </div>
+    <p class="hint">${h.note}</p>`;
+  bind();
+}
+
 function render(d){
   const b = d.best, req = d.request;
   const worst = Math.max(...b.steps.map(s=>s.loss_pct), 0.01);
@@ -214,6 +285,8 @@ function render(d){
       </p>
     </div>
 
+    <div class="chart" id="chart"></div>
+
     <div class="ladder">${steps}</div>
 
     ${alts?`<div class="alts"><h2>Другие маршруты</h2>${alts}</div>`:''}
@@ -229,6 +302,8 @@ function render(d){
              autocomplete="off" placeholder="Получено ${short(req.dst)}">
       <button id="save">Сохранить</button>
     </div>`;
+
+  drawChart();
 
   $('#save').onclick = async () => {
     const v = parseFloat($('#actual').value);
