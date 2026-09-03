@@ -144,6 +144,11 @@ h2{font-size:14px;font-weight:600;margin:30px 0 4px}
 const TOKEN = localStorage.getItem('panel_token') || '';
 const H = {'Content-Type':'application/json', ...(TOKEN?{'X-Token':TOKEN}:{})};
 const $ = s => document.querySelector(s);
+// Страница живёт и в корне своего адреса, и под префиксом (tailscale serve
+// --set-path /rate). Префикс режет прокси, поэтому адрес запроса собираем от
+// того пути, по которому пришла сама страница, а не от корня origin.
+const BASE = location.pathname.endsWith('/') ? location.pathname : location.pathname + '/';
+const api = p => BASE + p;
 let nodes = [], last = null;
 
 // Консоли на телефоне нет — любой сбой должен быть виден на странице
@@ -163,7 +168,7 @@ const nf = (v,d=2) => Number(v).toLocaleString('ru-RU',{minimumFractionDigits:d,
 const short = id => (nodes.find(n=>n.id===id)||{}).title || id;
 
 async function boot(){
-  nodes = await (await fetch('/api/nodes',{headers:H})).json();
+  nodes = await (await fetch(api('api/nodes'),{headers:H})).json();
   for (const sel of ['#src','#dst']){
     $(sel).innerHTML = nodes.map(n=>`<option value="${n.id}">${n.title}</option>`).join('');
   }
@@ -173,7 +178,7 @@ async function boot(){
 }
 
 async function loadStatus(){
-  const s = await (await fetch('/api/status',{headers:H})).json();
+  const s = await (await fetch(api('api/status'),{headers:H})).json();
   const a = s.accuracy;
   $('#cfg').innerHTML = `
     <span>Тариф Кошелька</span><b>${s.tier==='trader'?'Трейдер':'Базовый'}</b>
@@ -193,7 +198,7 @@ $('#f').onsubmit = async ev => {
   $('#go').textContent = 'Считаю…'; $('#go').disabled = true;
   try{
     const body = {src:$('#src').value, dst:$('#dst').value, amount:parseFloat($('#amt').value), routes:4};
-    const r = await fetch('/api/quote',{method:'POST',headers:H,body:JSON.stringify(body)});
+    const r = await fetch(api('api/quote'),{method:'POST',headers:H,body:JSON.stringify(body)});
     if(!r.ok){ $('#out').innerHTML = `<div class="note warn">${(await r.json()).detail}</div>`; return; }
     last = await r.json(); render(last);
     if (matchMedia('(max-width:800px)').matches)
@@ -220,8 +225,8 @@ async function drawChart(){
 
   let h;
   try{
-    h = await (await fetch(`/api/history?src=${req.src}&dst=${req.dst}`
-      + `&amount=${req.amount}&hours=${range}`, {headers:H})).json();
+    h = await (await fetch(api(`api/history?src=${req.src}&dst=${req.dst}`
+      + `&amount=${req.amount}&hours=${range}`), {headers:H})).json();
   }catch(e){ el.innerHTML = head; bind(); return; }
 
   const pts = h.points || [];
@@ -326,7 +331,7 @@ function render(d){
   $('#save').onclick = async () => {
     const v = parseFloat($('#actual').value);
     if(!v) return;
-    const r = await fetch('/api/deals',{method:'POST',headers:H,body:JSON.stringify({
+    const r = await fetch(api('api/deals'),{method:'POST',headers:H,body:JSON.stringify({
       route_key:b.key, pair:`${req.src}>${req.dst}`, amount_in:req.amount,
       predicted_out:b.amount_out, actual_out:v
     })});
