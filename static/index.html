@@ -43,10 +43,6 @@ body{margin:0;background:var(--paper);color:var(--ink);
   padding:28px var(--pad-x) calc(72px + env(safe-area-inset-bottom))}
 /* Полоса возврата. Показывается только когда панель отдана под префиксом:
    на отдельном входе :4420 соседних панелей нет и /hub там 404. */
-.nav{margin:0 0 12px;border-bottom:1px solid var(--rule)}
-.nav a{color:var(--soft);font-size:14px;text-decoration:none;
-  display:inline-flex;align-items:center;min-height:var(--tap)}
-@media(hover:hover){.nav a:hover{color:var(--ink)}}
 h1{font-size:20px;font-weight:600;margin:0 0 2px;letter-spacing:-.01em}
 .sub{color:var(--soft);font-size:14px;margin:0 0 24px}
 .cols{display:grid;grid-template-columns:320px 1fr;gap:32px;align-items:start}
@@ -124,8 +120,11 @@ h2{font-size:14px;font-weight:600;margin:30px 0 4px}
 </head>
 <body>
 <div class="wrap">
-  <nav class="nav" id="nav" hidden aria-label="Панели узла">
-    <a href="/hub">← Все панели</a>
+  <nav id="nav" hidden aria-label="Панели узла">
+    <a href="/hub">Все панели</a>
+    <a href="/">Хост</a>
+    <a href="/game">Пульт игры</a>
+    <a href="/rate" aria-current="page">Курс</a>
   </nav>
 
   <h1>Курс через Telegram Wallet</h1>
