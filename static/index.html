@@ -44,9 +44,15 @@ body{margin:0;background:var(--paper);color:var(--ink);
      считается ровно один раз в обоих случаях, а не дважды и не ноль раз. */
   padding-left:  var(--safe-l, env(safe-area-inset-left,   0px));
   padding-right: var(--safe-r, env(safe-area-inset-right,  0px));
-  padding-bottom:var(--safe-b, env(safe-area-inset-bottom, 0px));
-  -webkit-tap-highlight-color:color-mix(in oklab, var(--credit) 12%, transparent);
+  padding-bottom:calc(var(--space-lg, 0px) + var(--safe-b, env(safe-area-inset-bottom, 0px)));
+  -webkit-tap-highlight-color:transparent;
   overflow-wrap:break-word;}
+/* Отклик на касание — фоном, а не системной подсветкой. Под общим адресом
+   tokens.css гасит подсветку на каждом элементе через универсальный селектор,
+   и значение с body туда не доходит; там же объявлено это же правило. Здесь
+   оно нужно для своего входа :4420, где токенов нет: иначе на двух адресах
+   палец получал бы разный отклик. */
+a:active, button:active, label:active{background:var(--note)}
 .wrap{max-width:1020px;margin:0 auto;
   padding:28px var(--pad-x) 72px}
 /* Полоса возврата. Показывается только когда панель отдана под префиксом:
