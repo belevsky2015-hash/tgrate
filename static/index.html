@@ -39,10 +39,16 @@
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--paper);color:var(--ink);
   font:400 16px/1.5 var(--font-display, system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);
+  /* Вставки корпуса. tokens.css объявляет --safe-* и его body их применяет;
+     на своём входе :4420 токенов нет (404), тогда берётся env. Так вставка
+     считается ровно один раз в обоих случаях, а не дважды и не ноль раз. */
+  padding-left:  var(--safe-l, env(safe-area-inset-left,   0px));
+  padding-right: var(--safe-r, env(safe-area-inset-right,  0px));
+  padding-bottom:var(--safe-b, env(safe-area-inset-bottom, 0px));
   -webkit-tap-highlight-color:color-mix(in oklab, var(--credit) 12%, transparent);
   overflow-wrap:break-word;}
 .wrap{max-width:1020px;margin:0 auto;
-  padding:28px var(--pad-x) calc(72px + env(safe-area-inset-bottom))}
+  padding:28px var(--pad-x) 72px}
 /* Полоса возврата. Показывается только когда панель отдана под префиксом:
    на отдельном входе :4420 соседних панелей нет и /hub там 404. */
 h1{font-size:20px;font-weight:600;margin:0 0 2px;letter-spacing:-.01em}
