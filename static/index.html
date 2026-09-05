@@ -29,8 +29,10 @@
   --num:       var(--font-mono, ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace);
   /* 44pt — минимальная цель нажатия по Apple HIG */
   --tap:44px;
-  /* в альбомной ориентации XS Max прячет 44px под скруглениями корпуса */
-  --pad-x:max(20px, env(safe-area-inset-left), env(safe-area-inset-right));
+  /* Боковые вставки корпуса теперь считает body в /tokens.css, общий для всех
+     панелей. Здесь остаются только собственные поля страницы: складывать
+     вставку дважды незачем. */
+  --pad-x:20px;
 }
 *{box-sizing:border-box}
 /* Safari в альбомной раздувает шрифт без этого */
