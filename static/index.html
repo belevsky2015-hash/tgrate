@@ -3,34 +3,41 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F1F3F0" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#14191D" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#fafafb">
+<!-- Путь от корня, не относительный: панель отдаётся и по /rate, и по /rate/,
+     а от /rate относительный путь резолвится в корень. -->
+<link rel="stylesheet" href="/tokens.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ctext y=%2726%27 font-size=%2728%27%3E%E2%82%BD%3C/text%3E%3C/svg%3E">
 <title>Курс через Telegram Wallet</title>
 <style>
 :root{
-  --paper:#F1F3F0; --ink:#16202A; --rule:#C6CFCB; --soft:#6C7A80;
-  --credit:#0B6E4F; --debit:#A93A2C; --field:#FFFFFF;
-  --note:#E6EAE5; --note-ink:#42525A; --btn-hover:#22303C;
-  --num:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  /* Значения — из общей системы узла (/tokens.css). Здесь сопоставление
+     местных имён общим, чтобы не переписывать всю разметку.
+     Запасные значения обязательны: на отдельном входе :4420 файла токенов
+     нет (404), и без них панель осталась бы вовсе без цвета. Дублируют
+     светлую тему tokens.css на 05.09.2026. */
+  --paper:     var(--color-paper,   oklch(98.5% 0.004 260));
+  --ink:       var(--color-ink,     oklch(39.0% 0.015 260));
+  --rule:      var(--color-rule,    oklch(90.0% 0.008 260));
+  --soft:      var(--color-ink-3,   oklch(53.0% 0.016 260));
+  --field:     var(--color-paper,   oklch(98.5% 0.004 260));
+  --note:      var(--color-paper-2, oklch(96.0% 0.006 260));
+  --note-ink:  var(--color-ink-2,   oklch(51.0% 0.016 260));
+  --btn-hover: var(--color-ink-2,   oklch(51.0% 0.016 260));
+  --credit:    var(--color-mem,     oklch(49.0% 0.110 168));
+  --debit:     var(--color-fault,   oklch(53.0% 0.170  25));
+  --num:       var(--font-mono, ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace);
   /* 44pt — минимальная цель нажатия по Apple HIG */
   --tap:44px;
   /* в альбомной ориентации XS Max прячет 44px под скруглениями корпуса */
   --pad-x:max(20px, env(safe-area-inset-left), env(safe-area-inset-right));
 }
-@media (prefers-color-scheme:dark){
-  :root{
-    --paper:#14191D; --ink:#E8EDEA; --rule:#2C363C; --soft:#93A1A8;
-    --credit:#4FBF8B; --debit:#E4796B; --field:#1C2328;
-    --note:#1B2226; --note-ink:#AEBBC1; --btn-hover:#CBD5D0;
-  }
-}
 *{box-sizing:border-box}
 /* Safari в альбомной раздувает шрифт без этого */
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--paper);color:var(--ink);
-  font:400 16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-  -webkit-tap-highlight-color:rgba(11,110,79,.12);
+  font:400 16px/1.5 var(--font-display, system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);
+  -webkit-tap-highlight-color:color-mix(in oklab, var(--credit) 12%, transparent);
   overflow-wrap:break-word;}
 .wrap{max-width:1020px;margin:0 auto;
   padding:28px var(--pad-x) calc(72px + env(safe-area-inset-bottom))}
@@ -42,13 +49,13 @@ h1{font-size:20px;font-weight:600;margin:0 0 2px;letter-spacing:-.01em}
 label{display:block;font-size:13px;color:var(--soft);margin:14px 0 5px}
 /* 16px ровно: на меньшем размере iOS зумит страницу при фокусе в поле */
 select,input{width:100%;padding:11px 12px;border:1px solid var(--rule);
-  border-radius:8px;background:var(--field);color:var(--ink);
+  border-radius:0;background:var(--field);color:var(--ink);
   font-size:16px;min-height:var(--tap)}
 /* appearance:none только для input — у select он съел бы родную стрелку */
 input{-webkit-appearance:none;appearance:none}
 input[type=number]{font-family:var(--num);font-variant-numeric:tabular-nums}
 select:focus-visible,input:focus-visible{outline:2px solid var(--credit);outline-offset:1px;border-color:transparent}
-button{margin-top:18px;width:100%;min-height:48px;padding:0 16px;border:0;border-radius:8px;
+button{margin-top:18px;width:100%;min-height:48px;padding:0 16px;border:0;border-radius:0;
   background:var(--ink);color:var(--paper);font-size:16px;font-weight:500;cursor:pointer;
   -webkit-appearance:none;appearance:none}
 @media(hover:hover){button:hover{background:var(--btn-hover)}}
@@ -76,7 +83,7 @@ button.ghost{background:none;color:var(--soft);border:1px solid var(--rule);marg
 .hint{font-size:13px;color:var(--soft);margin-top:3px}
 .amt{font-family:var(--num);font-variant-numeric:tabular-nums;font-size:15px;text-align:right;white-space:nowrap}
 .cut{display:block;font-size:12.5px;color:var(--debit);margin-top:3px}
-.bar{height:3px;background:var(--debit);opacity:.5;margin-top:6px;border-radius:2px}
+.bar{height:3px;background:var(--debit);opacity:.5;margin-top:6px}
 
 .alts{margin-top:26px}
 .alt{display:flex;justify-content:space-between;gap:12px;padding:13px 0;
@@ -86,7 +93,7 @@ button.ghost{background:none;color:var(--soft);border:1px solid var(--rule);marg
 @media(hover:hover){.alt:hover{color:var(--credit)}}
 
 .note{background:var(--note);border-left:3px solid var(--soft);padding:11px 14px;
-  font-size:13.5px;color:var(--note-ink);border-radius:0 5px 5px 0;margin-top:20px}
+  font-size:13.5px;color:var(--note-ink);margin-top:20px}
 .note.warn{border-left-color:var(--debit)}
 h2{font-size:14px;font-weight:600;margin:30px 0 4px}
 .grid{display:grid;grid-template-columns:1fr auto;gap:6px 14px;font-size:13.5px;
@@ -238,7 +245,14 @@ async function drawChart(){
 
   const W = 600, HH = 170, P = 6;
   const ys = pts.map(p => p.rate);
-  const lo = Math.min(...ys), hi = Math.max(...ys), span = (hi - lo) || hi || 1;
+  let lo = Math.min(...ys), hi = Math.max(...ys);
+  // Шкала не растягивается под минимум-максимум. Иначе на ровных данных
+  // рябь в четвёртом знаке рисуется как размах на весь экран и читается
+  // как движение курса. Минимальный размах — полпроцента от середины:
+  // меньше этого на графике про деньги показывать нечего.
+  const mid = (hi + lo) / 2 || 1, minSpan = Math.abs(mid) * 0.005;
+  if (hi - lo < minSpan) { lo = mid - minSpan / 2; hi = mid + minSpan / 2; }
+  const span = (hi - lo) || 1;
   const x = i => P + i * (W - 2*P) / (pts.length - 1);
   const y = v => P + (1 - (v - lo) / span) * (HH - 2*P);
   const line = pts.map((p,i) => `${i?'L':'M'}${x(i).toFixed(1)},${y(p.rate).toFixed(1)}`).join('');
@@ -259,7 +273,7 @@ async function drawChart(){
     </svg>
     <div class="cap">
       <span>${fmt(pts[0].t)}</span>
-      <span>мин <b>${nf(lo,d)}</b> · макс <b>${nf(hi,d)}</b></span>
+      <span>мин <b>${nf(Math.min(...ys),d)}</b> · макс <b>${nf(Math.max(...ys),d)}</b></span>
       <span>${fmt(pts[pts.length-1].t)}</span>
     </div>
     <div class="cap">
