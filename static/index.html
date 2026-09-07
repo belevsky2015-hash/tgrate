@@ -44,7 +44,8 @@ body{margin:0;background:var(--paper);color:var(--ink);
      считается ровно один раз в обоих случаях, а не дважды и не ноль раз. */
   padding-left:  var(--safe-l, env(safe-area-inset-left,   0px));
   padding-right: var(--safe-r, env(safe-area-inset-right,  0px));
-  padding-bottom:calc(var(--space-lg, 0px) + var(--safe-b, env(safe-area-inset-bottom, 0px)));
+  /* Место под нижнюю панель вкладок: она fixed и накрыла бы низ страницы. */
+  padding-bottom:calc(var(--space-lg, 0px) + var(--nav-h, 52px) + var(--safe-b, env(safe-area-inset-bottom, 0px)));
   -webkit-tap-highlight-color:transparent;
   overflow-wrap:break-word;}
 /* Отклик на касание — фоном, а не системной подсветкой. Под общим адресом
