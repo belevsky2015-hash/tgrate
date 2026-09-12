@@ -7,6 +7,7 @@
 <!-- Путь от корня, не относительный: панель отдаётся и по /rate, и по /rate/,
      а от /rate относительный путь резолвится в корень. -->
 <link rel="stylesheet" href="/tokens.css">
+<script src="/nav.js" defer></script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ctext y=%2726%27 font-size=%2728%27%3E%E2%82%BD%3C/text%3E%3C/svg%3E">
 <title>Курс через Telegram Wallet</title>
 <style>
@@ -135,15 +136,7 @@ h2{font-size:14px;font-weight:600;margin:30px 0 4px}
 </head>
 <body>
 <div class="wrap">
-  <nav id="nav" hidden aria-label="Панели узла">
-    <a href="/hub">Панели</a>
-    <a href="/">Хост</a>
-    <a href="/game">Игра</a>
-    <a href="/rate" aria-current="page">Курс</a>
-    <a href="/grab/">Грабь</a>
-    <a href="/files">Файлы</a>
-    <a href="/anon">Аноним</a>
-  </nav>
+  <nav aria-label="Панели узла"></nav>
 
   <h1>Курс через Telegram Wallet</h1>
   <p class="sub">Считает по стакану P2P Маркета на вашу сумму, с комиссиями обмена и вывода.</p>
@@ -185,7 +178,8 @@ const BASE = location.pathname.endsWith('/') ? location.pathname : location.path
 const api = p => BASE + p;
 // Соседние панели существуют только когда мы отданы под префиксом общего
 // адреса. На своём входе ссылка вела бы в 404, поэтому её там нет.
-if (BASE !== '/') document.querySelector('#nav').hidden = false;
+// Полосу строит и скрывает /nav.js: на прямом входе :4420 соседних
+// панелей нет, и он это определяет по порту, а не по пути.
 let nodes = [], last = null;
 
 // Консоли на телефоне нет — любой сбой должен быть виден на странице
