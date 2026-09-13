@@ -38,7 +38,10 @@
 *{box-sizing:border-box}
 /* Safari в альбомной раздувает шрифт без этого */
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--paper);color:var(--ink);
+/* Бумага на корне, а не на body: под body лежит слой фоновой графики
+   из общих токенов, и фон body его закрыл бы. */
+html{background:var(--paper)}
+body{margin:0;background:transparent;color:var(--ink);
   font:400 16px/1.5 var(--font-display, system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);
   /* Вставки корпуса. tokens.css объявляет --safe-* и его body их применяет;
      на своём входе :4420 токенов нет (404), тогда берётся env. Так вставка
