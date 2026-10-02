@@ -14,7 +14,7 @@
 :root{
   /* Значения — из общей системы узла (/tokens.css). Здесь сопоставление
      местных имён общим, чтобы не переписывать всю разметку.
-     Запасные значения обязательны: на отдельном входе :4420 файла токенов
+     Запасные значения обязательны: на отдельном входе :8080 файла токенов
      нет (404), и без них панель осталась бы вовсе без цвета. Дублируют
      светлую тему tokens.css на 05.09.2026. */
   --paper:     var(--color-paper,   oklch(98.5% 0.004 260));
@@ -44,7 +44,7 @@ html{background:var(--paper)}
 body{margin:0;background:transparent;color:var(--ink);
   font:400 16px/1.5 var(--font-display, system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);
   /* Вставки корпуса. tokens.css объявляет --safe-* и его body их применяет;
-     на своём входе :4420 токенов нет (404), тогда берётся env. Так вставка
+     на своём входе :8080 токенов нет (404), тогда берётся env. Так вставка
      считается ровно один раз в обоих случаях, а не дважды и не ноль раз. */
   padding-left:  var(--safe-l, env(safe-area-inset-left,   0px));
   padding-right: var(--safe-r, env(safe-area-inset-right,  0px));
@@ -55,13 +55,13 @@ body{margin:0;background:transparent;color:var(--ink);
 /* Отклик на касание — фоном, а не системной подсветкой. Под общим адресом
    tokens.css гасит подсветку на каждом элементе через универсальный селектор,
    и значение с body туда не доходит; там же объявлено это же правило. Здесь
-   оно нужно для своего входа :4420, где токенов нет: иначе на двух адресах
+   оно нужно для своего входа :8080, где токенов нет: иначе на двух адресах
    палец получал бы разный отклик. */
 a:active, button:active, label:active{background:var(--note)}
 .wrap{max-width:1020px;margin:0 auto;
   padding:28px var(--pad-x) 72px}
 /* Полоса возврата. Показывается только когда панель отдана под префиксом:
-   на отдельном входе :4420 соседних панелей нет и /hub там 404. */
+   на отдельном входе :8080 соседних панелей нет и /hub там 404. */
 h1{font-size:20px;font-weight:600;margin:0 0 2px;letter-spacing:-.01em}
 .sub{color:var(--soft);font-size:14px;margin:0 0 24px}
 .cols{display:grid;grid-template-columns:320px 1fr;gap:32px;align-items:start}
@@ -123,10 +123,17 @@ h2{font-size:14px;font-weight:600;margin:30px 0 4px}
 .fact{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:10px}
 .fact input{margin:0}.fact button{margin:0;width:auto;padding:0 18px}
 .chart{margin-top:26px}
-.chart svg{width:100%;height:170px;display:block}
+.chart svg{width:100%;display:block}
 .chart .line{fill:none;stroke:var(--credit);stroke-width:2;vector-effect:non-scaling-stroke;
   stroke-linejoin:round;stroke-linecap:round}
 .chart .area{fill:var(--credit);opacity:.10}
+.chart .mark{stroke-width:1;vector-effect:non-scaling-stroke;stroke-dasharray:4 3}
+.chart .mark.best{stroke:var(--credit)}
+.chart .mark.worst{stroke:var(--debit)}
+.chart .cap .best b{color:var(--credit)}
+.chart .cap .worst b{color:var(--debit)}
+.chart .leg{margin-top:18px}
+.chart .leg svg{margin-top:6px}
 .range{display:flex;gap:8px;margin:10px 0}
 .range button{margin:0;width:auto;flex:1;min-height:var(--tap);font-size:14px;font-weight:400;
   background:none;color:var(--soft);border:1px solid var(--rule)}
@@ -148,10 +155,19 @@ h2{font-size:14px;font-weight:600;margin:30px 0 4px}
     <form id="f">
       <label for="src">Откуда</label>
       <select id="src"></select>
+      <!-- Способ оплаты: только у фиата, список — из живого стакана -->
+      <div id="pay-src-box" hidden>
+        <label for="pay-src" id="pay-src-l">Как платите</label>
+        <select id="pay-src"></select>
+      </div>
       <button type="button" class="swap" id="swap">поменять местами</button>
 
       <label for="dst">Куда</label>
       <select id="dst"></select>
+      <div id="pay-dst-box" hidden>
+        <label for="pay-dst" id="pay-dst-l">Как получаете</label>
+        <select id="pay-dst"></select>
+      </div>
 
       <label for="amt">Сумма</label>
       <input id="amt" type="number" step="any" value="50000" min="0"
@@ -174,14 +190,14 @@ h2{font-size:14px;font-weight:600;margin:30px 0 4px}
 const TOKEN = localStorage.getItem('panel_token') || '';
 const H = {'Content-Type':'application/json', ...(TOKEN?{'X-Token':TOKEN}:{})};
 const $ = s => document.querySelector(s);
-// Страница живёт и в корне своего адреса, и под префиксом (tailscale serve
-// --set-path /rate). Префикс режет прокси, поэтому адрес запроса собираем от
+// Страница живёт и в корне своего адреса (:8080), и под префиксом /rate у
+// панели хоста. Префикс режет прокси, поэтому адрес запроса собираем от
 // того пути, по которому пришла сама страница, а не от корня origin.
 const BASE = location.pathname.endsWith('/') ? location.pathname : location.pathname + '/';
 const api = p => BASE + p;
 // Соседние панели существуют только когда мы отданы под префиксом общего
 // адреса. На своём входе ссылка вела бы в 404, поэтому её там нет.
-// Полосу строит и скрывает /nav.js: на прямом входе :4420 соседних
+// Полосу строит и скрывает /nav.js: на прямом входе :8080 соседних
 // панелей нет, и он это определяет по порту, а не по пути.
 let nodes = [], last = null;
 
@@ -199,79 +215,133 @@ addEventListener('error', e => showErr(e.message));
 addEventListener('unhandledrejection', e => showErr((e.reason && e.reason.message) || e.reason));
 
 const nf = (v,d=2) => Number(v).toLocaleString('ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d});
+// Ники и способы оплаты приходят из стакана чужих людей — только через esc
+const esc = v => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const short = id => (nodes.find(n=>n.id===id)||{}).title || id;
 
-async function boot(){
-  nodes = await (await fetch(api('api/nodes'),{headers:H})).json();
-  for (const sel of ['#src','#dst']){
-    $(sel).innerHTML = nodes.map(n=>`<option value="${n.id}">${n.title}</option>`).join('');
+// Все запросы — через getJSON. Пока панель перезапускается, прокси отдаёт
+// текст «панель не отвечает», а не JSON; r.json() на нём падал непонятной
+// ошибкой разбора — со стороны это выглядело как «страница вылетела».
+async function getJSON(path, opts){
+  let r;
+  try { r = await fetch(api(path), {headers:H, ...opts}); }
+  catch(e){ throw new Error('нет связи с панелью — проверьте туннель и обновите страницу'); }
+  let data = null;
+  try { data = await r.json(); } catch(e){}
+  if (!r.ok || data === null){
+    const d = data && data.detail;
+    // FastAPI отдаёт ошибки проверки полей списком объектов
+    const msg = typeof d === 'string' ? d
+      : Array.isArray(d) ? 'проверьте введённые числа'
+      : r.status >= 500 ? 'панель курса перезапускается или не отвечает — обновите через минуту'
+      : 'ошибка ' + r.status;
+    const err = new Error(msg); err.soft = r.status === 400; throw err;
   }
+  return data;
+}
+function showNote(msg){
+  const d = document.createElement('div');
+  d.className = 'note warn'; d.textContent = msg;
+  $('#out').replaceChildren(d);
+}
+
+async function boot(){
+  nodes = await getJSON('api/nodes');
+  // «Откуда» — только точки, из которых есть операции; «Куда» — в которые есть
+  $('#src').innerHTML = nodes.filter(n => n.from !== false)
+    .map(n=>`<option value="${n.id}">${esc(n.title)}</option>`).join('');
+  $('#dst').innerHTML = nodes.filter(n => n.to !== false)
+    .map(n=>`<option value="${n.id}">${esc(n.title)}</option>`).join('');
   $('#src').value = 'RUB.BANK';
   $('#dst').value = 'USDT.WALLET';
   loadStatus();
+  loadMethods('src'); loadMethods('dst');
 }
 
+// Фиатные точки — X.BANK. Способы оплаты у них — из стакана Wallet: сколько
+// живых мейкеров принимают каждый. Пустое значение — способы из настроек.
+const fiatOf = id => /\.BANK$/.test(id) ? (nodes.find(n=>n.id===id)||{}).asset : null;
+async function loadMethods(which){
+  const box = $(`#pay-${which}-box`), sel = $(`#pay-${which}`);
+  const fiat = fiatOf($('#'+which).value);
+  if (!fiat) { box.hidden = true; sel.innerHTML = ''; sel.dataset.fiat = ''; return; }
+  const dir = which === 'src' ? 'buy' : 'sell';
+  const prev = sel.dataset.fiat === fiat ? sel.value : '';
+  try{
+    const m = await getJSON(`api/methods?fiat=${fiat}&direction=${dir}`);
+    const def = m.default.length ? 'как в настройках: ' + m.default.join(', ') : 'любой способ';
+    sel.innerHTML = `<option value="">${esc(def)}</option>` + m.methods.map(x =>
+      `<option value="${esc(x.code)}">${esc(x.name)} · ${x.ads} объявл.</option>`).join('');
+    sel.dataset.fiat = fiat;
+    if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+    $(`#pay-${which}-l`).textContent = (which === 'src' ? 'Как платите, ' : 'Как получаете, ') + fiat;
+    box.hidden = false;
+  } catch(e){ box.hidden = true; sel.dataset.fiat = ''; }
+}
+function chosenPay(){
+  const pay = {};
+  for (const w of ['src','dst']){
+    const sel = $(`#pay-${w}`);
+    if (sel.dataset.fiat && sel.value) pay[sel.dataset.fiat] = [sel.value];
+  }
+  return pay;
+}
+$('#src').onchange = () => loadMethods('src');
+$('#dst').onchange = () => loadMethods('dst');
+
 async function loadStatus(){
-  const s = await (await fetch(api('api/status'),{headers:H})).json();
+  const s = await getJSON('api/status');
   const a = s.accuracy;
   $('#cfg').innerHTML = `
     <span>Тариф Кошелька</span><b>${s.tier==='trader'?'Трейдер':'Базовый'}</b>
     <span>Комиссия обмена</span><b>${s.exchange_fee_pct}%</b>
     <span>Роль на P2P</span><b>${s.role==='maker'?'мейкер':'тейкер'} · ${s.p2p_fee_pct}%</b>
     <span>Котировки</span><b>${s.quotes.age_sec ?? '—'} с назад</b>
-    <span>Ошибка прогноза</span><b>${a.deals ? a.mae_pct+'%' : 'нет данных'}</b>`;
+    <span>Промах модели по сделкам</span><b>${a.deals ? a.mae_pct+'% · '+a.deals : 'сделок нет'}</b>`;
 }
 
 $('#swap').onclick = () => {
-  const a = $('#src').value; $('#src').value = $('#dst').value; $('#dst').value = a;
+  const a = $('#src').value, b = $('#dst').value;
+  // Не каждую точку можно поменять местами: USDT у контакта — только «куда»
+  if (![...$('#src').options].some(o => o.value === b) ||
+      ![...$('#dst').options].some(o => o.value === a)){
+    showNote(`«${short(b)}» не может быть началом маршрута — поменять местами нельзя.`);
+    return;
+  }
+  $('#src').value = b; $('#dst').value = a;
+  loadMethods('src'); loadMethods('dst');
 };
-$('#refresh').onclick = async () => { await loadStatus(); $('#f').requestSubmit(); };
+$('#refresh').onclick = async () => {
+  try { await loadStatus(); } catch(e){ showErr(e.message); return; }
+  $('#f').requestSubmit();
+};
 
 $('#f').onsubmit = async ev => {
   ev.preventDefault();
+  const amount = parseFloat(String($('#amt').value).replace(',', '.'));
+  if (!(amount > 0)) { showNote('Введите сумму больше нуля.'); $('#amt').focus(); return; }
+  if ($('#go').disabled) return;              // второе нажатие, пока считаем
   $('#go').textContent = 'Считаю…'; $('#go').disabled = true;
   try{
-    const body = {src:$('#src').value, dst:$('#dst').value, amount:parseFloat($('#amt').value), routes:4};
-    const r = await fetch(api('api/quote'),{method:'POST',headers:H,body:JSON.stringify(body)});
-    if(!r.ok){ $('#out').innerHTML = `<div class="note warn">${(await r.json()).detail}</div>`; return; }
-    last = await r.json(); render(last);
+    const body = {src:$('#src').value, dst:$('#dst').value, amount, routes:4, pay:chosenPay()};
+    last = await getJSON('api/quote', {method:'POST', body:JSON.stringify(body)});
+    render(last);
     if (matchMedia('(max-width:800px)').matches)
       $('#out').scrollIntoView({behavior:'smooth', block:'start'});
-    loadStatus();
-  } catch(err){ showErr(err.message || err);
+    loadStatus().catch(() => {});
+  } catch(err){ err.soft ? showNote(err.message) : showErr(err.message || err);
   } finally { $('#go').textContent = 'Посчитать'; $('#go').disabled = false; }
 };
 
 
 let range = 24;
 
-async function drawChart(){
-  const el = $('#chart');
-  if(!el || !last) return;
-  const req = last.request;
-  const btns = [[6,'6 ч'],[24,'сутки'],[168,'неделя']].map(([v,t]) =>
-    `<button type="button" data-h="${v}" aria-pressed="${v===range}">${t}</button>`).join('');
-  const head = `<h2>Курс ${short(req.src)} → ${short(req.dst)}</h2><div class="range">${btns}</div>`;
-
-  const bind = () => el.querySelectorAll('.range button').forEach(b => {
-    b.onclick = () => { range = +b.dataset.h; drawChart(); };
-  });
-
-  let h;
-  try{
-    h = await (await fetch(api(`api/history?src=${req.src}&dst=${req.dst}`
-      + `&amount=${req.amount}&hours=${range}`), {headers:H})).json();
-  }catch(e){ el.innerHTML = head; bind(); return; }
-
-  const pts = h.points || [];
-  if(pts.length < 2){
-    el.innerHTML = head + `<p class="hint">История копится с момента запуска панели.
-      Первые точки появятся через пару минут, за неделю график наберётся сам.</p>`;
-    bind(); return;
-  }
-
-  const W = 600, HH = 170, P = 6;
-  const ys = pts.map(p => p.rate);
+// Один ряд на общей оси времени [t0, t1]. Итог и цены по шагам рисуются
+// друг под другом на одной оси, поэтому метки «выгоднее всего» и «хуже
+// всего» проходят через все графики в один и тот же момент.
+function spark(pts, t0, t1, marks, HH){
+  const W = 600, P = 6;
+  const ys = pts.map(p => p.v);
   let lo = Math.min(...ys), hi = Math.max(...ys);
   // Шкала не растягивается под минимум-максимум. Иначе на ровных данных
   // рябь в четвёртом знаке рисуется как размах на весь экран и читается
@@ -279,36 +349,140 @@ async function drawChart(){
   // меньше этого на графике про деньги показывать нечего.
   const mid = (hi + lo) / 2 || 1, minSpan = Math.abs(mid) * 0.005;
   if (hi - lo < minSpan) { lo = mid - minSpan / 2; hi = mid + minSpan / 2; }
-  const span = (hi - lo) || 1;
-  const x = i => P + i * (W - 2*P) / (pts.length - 1);
-  const y = v => P + (1 - (v - lo) / span) * (HH - 2*P);
-  const line = pts.map((p,i) => `${i?'L':'M'}${x(i).toFixed(1)},${y(p.rate).toFixed(1)}`).join('');
-  const area = `${line}L${x(pts.length-1).toFixed(1)},${HH}L${x(0).toFixed(1)},${HH}Z`;
+  const span = (hi - lo) || 1, dt = (t1 - t0) || 1;
+  const x = t => (P + (t - t0) / dt * (W - 2*P)).toFixed(1);
+  const y = v => (P + (1 - (v - lo) / span) * (HH - 2*P)).toFixed(1);
+  const line = pts.map((p,i) => `${i?'L':'M'}${x(p.t)},${y(p.v)}`).join('');
+  const area = `${line}L${x(pts[pts.length-1].t)},${HH}L${x(pts[0].t)},${HH}Z`;
+  const m = marks.map(k => `<line class="mark ${k.cls}" x1="${x(k.t)}" x2="${x(k.t)}" y1="0" y2="${HH}"></line>`).join('');
+  return `<svg viewBox="0 0 ${W} ${HH}" preserveAspectRatio="none" aria-hidden="true" style="height:${HH}px">
+    <path class="area" d="${area}"></path>${m}<path class="line" d="${line}"></path></svg>`;
+}
+
+// Крайние точки ряда: первое вхождение максимума и минимума
+function extremes(pts){
+  let hi = pts[0], lo = pts[0];
+  for (const p of pts){ if (p.v > hi.v) hi = p; if (p.v < lo.v) lo = p; }
+  return {hi, lo};
+}
+
+async function drawChart(){
+  const el = $('#chart');
+  if(!el || !last) return;
+  const req = last.request;
+  const btns = [[6,'6 ч'],[24,'сутки'],[168,'неделя']].map(([v,t]) =>
+    `<button type="button" data-h="${v}" aria-pressed="${v===range}">${t}</button>`).join('');
+  const head = `<h2>Сколько пришло бы за ${nf(req.amount,0)} · ${short(req.src)} → ${short(req.dst)}</h2>
+    <div class="range">${btns}</div>`;
+
+  const bind = () => el.querySelectorAll('.range button').forEach(b => {
+    b.onclick = () => { range = +b.dataset.h; drawChart(); };
+  });
+
+  let h;
+  try{
+    h = await getJSON(`api/history?src=${req.src}&dst=${req.dst}`
+      + `&amount=${req.amount}&hours=${range}`
+      + `&pay=${encodeURIComponent(JSON.stringify(req.pay||{}))}`);
+  }catch(e){ el.innerHTML = head; bind(); return; }
+
+  const pts = (h.points || []).map(p => ({t:p.t, v:p.rate * req.amount, legs:p.legs || {}}));
+  if(pts.length < 2){
+    el.innerHTML = head + `<p class="hint">Точек пока нет: ${esc(h.note || '')}.
+      Записи копятся раз в минуту, за сутки график наберётся сам.</p>`;
+    bind(); return;
+  }
+
+  const t0 = pts[0].t, t1 = pts[pts.length-1].t;
   const fmt = t => new Date(t*1000).toLocaleString('ru-RU',
-    range > 48 ? {day:'numeric', month:'short'} : {hour:'2-digit', minute:'2-digit'});
-  const d = ys[0] < 1 ? 6 : 4;
-  const chg = h.change_pct ?? 0;
-  // на коротком окне курс двигается в четвёртом знаке процента —
-  // округление до сотых показывало бы ровный ноль
-  const chgTxt = Math.abs(chg) < 0.01 ? chg.toFixed(4) : nf(chg, 2);
+    range > 48 ? {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}
+               : {hour:'2-digit', minute:'2-digit'});
+  const unit = (nodes.find(n => n.id === req.dst) || {}).asset || short(req.dst);
+  const dOut = pts[0].v < 10 ? 4 : 2;
+  const {hi, lo} = extremes(pts);
+  const marks = [{t:hi.t, cls:'best'}, {t:lo.t, cls:'worst'}];
+  // Разброс, а не «изменение за период»: скачок — это смена продавца в
+  // стакане, а не движение рынка (см. DESIGN.md, «Про графики и числа»).
+  const spread = (hi.v / lo.v - 1) * 100;
+
+  const legs = (h.legs_meta || []).map(m => {
+    const lp = pts.filter(p => m.id in p.legs).map(p => ({t:p.t, v:p.legs[m.id]}));
+    if (lp.length < 2) return '';
+    const d = lp[0].v < 10 ? 4 : 2;
+    const e = extremes(lp);
+    const cheap = m.better === 'low' ? e.lo : e.hi, dear = m.better === 'low' ? e.hi : e.lo;
+    const at = t => { const p = lp.find(q => q.t === t); return p && nf(p.v, d); };
+    // Цены по шагам пишутся с 27.09.2026 17:32 — у более ранних точек их нет,
+    // и это надо сказать словами, а не прочерком.
+    const since = lp[0].t > t0 ? `<span>цены шага пишутся с ${fmt(lp[0].t)}</span>` : '';
+    const range_ = cheap.v === dear.v
+      ? `<span>без изменений <b>${nf(cheap.v,d)}</b> ${esc(m.unit)}</span>`
+      : `<span>лучше всего <b>${nf(cheap.v,d)}</b> в ${fmt(cheap.t)}</span>
+         <span>хуже всего <b>${nf(dear.v,d)}</b> в ${fmt(dear.t)}</span>`;
+    const hiAt = at(hi.t), loAt = at(lo.t);
+    return `<div class="leg">
+      <div class="path">${esc(m.title)}</div>
+      ${spark(lp, t0, t1, marks, 90)}
+      <div class="cap">${range_}${since}</div>
+      <div class="cap">
+        ${hiAt ? `<span class="best">в лучший момент итога <b>${hiAt}</b></span>` : ''}
+        ${loAt ? `<span class="worst">в худший <b>${loAt}</b></span>` : ''}
+        <span>сейчас <b>${nf(lp[lp.length-1].v,d)}</b> ${esc(m.unit)}</span>
+      </div>
+    </div>`;
+  }).join('');
 
   el.innerHTML = head + `
-    <svg viewBox="0 0 ${W} ${HH}" preserveAspectRatio="none" role="img"
-         aria-label="Курс ${short(req.src)} → ${short(req.dst)}, изменение ${chg}% за период">
-      <path class="area" d="${area}"></path>
-      <path class="line" d="${line}"></path>
-    </svg>
+    ${spark(pts, t0, t1, marks, 170)}
     <div class="cap">
-      <span>${fmt(pts[0].t)}</span>
-      <span>мин <b>${nf(Math.min(...ys),d)}</b> · макс <b>${nf(Math.max(...ys),d)}</b></span>
-      <span>${fmt(pts[pts.length-1].t)}</span>
+      <span>${fmt(t0)}</span>
+      <span>разброс <b>${nf(spread,2)}%</b></span>
+      <span>${fmt(t1)}</span>
     </div>
     <div class="cap">
-      <span>сейчас <b>${nf(ys[ys.length-1],d)}</b></span>
-      <span>${chg > 0 ? '+' : ''}${chgTxt}% за период</span>
+      <span class="best">выгоднее всего <b>${nf(hi.v,dOut)}</b> ${esc(unit)} в ${fmt(hi.t)}</span>
+      <span class="worst">хуже всего <b>${nf(lo.v,dOut)}</b> в ${fmt(lo.t)}</span>
+      <span>сейчас <b>${nf(pts[pts.length-1].v,dOut)}</b></span>
     </div>
-    <p class="hint">${h.note}</p>`;
+    ${legs ? `<h2>Цена крипты на каждом шаге</h2>
+      <p class="hint">Зелёная метка — момент, когда итог был лучше всего, красная — хуже всего.
+        По шагам видно, какая цена дала разницу.</p>${legs}` : ''}
+    <p class="hint">${esc(h.note)}</p>`;
   bind();
+}
+
+// Кто реально закроет P2P-ногу: надёжные мейкеры, которые берут всю
+// сумму одной сделкой. Прогноз по этой ноге считан из этого же списка.
+function sellers(leg){
+  const who = leg.direction==='buy' ? `Продают USDT за ${esc(leg.fiat)}` : `Покупают USDT за ${esc(leg.fiat)}`;
+  const rows = leg.top.map((t,i)=>`
+    <div class="step">
+      <div class="idx">${i+1}</div>
+      <div>
+        <div class="path">${esc(t.nickname)}${t.level==='TRUSTED_MERCHANT'?' · надёжный продавец':''}</div>
+        <div class="hint">исполнено ${Math.round(t.execute_rate*100)}% · ${nf(t.orders,0)} сделок
+          · от ${nf(t.min_fiat,0)} до ${nf(t.max_fiat,0)} ${esc(leg.fiat)}
+          · оплата ${t.payment_min} мин${t.auto_accept?' · автопринятие':''}</div>
+        <div class="hint">${t.payments.map(esc).join(', ')}</div>
+      </div>
+      <div class="amt">${nf(t.price, t.price<10?4:2)}</div>
+    </div>`).join('');
+  const none = `<div class="note warn">Ни один надёжный мейкер не берёт ${nf(leg.depth_crypto,2)} USDT одной сделкой.
+    Цена ${nf(leg.price, leg.price<10?4:2)} — ${esc(leg.basis)}, сделок: ${leg.ads_used}.</div>`;
+  return `<div class="alts"><h2>${who} — топ надёжных на вашу сумму</h2>
+    <p class="hint">Способ: ${leg.pay.length ? leg.pay.map(esc).join(', ') : 'любой'}.
+      Прогноз: ${esc(leg.basis)}, ${nf(leg.price, leg.price<10?4:2)} ${esc(leg.fiat)} за USDT.
+      Надёжный — статус Кошелька или от 95% исполнения и 250 сделок.</p>
+    ${leg.top.length ? `<div class="ladder">${rows}</div>` : none}</div>`;
+}
+
+// Курс словами: «1 EUR = 107,15 RUB», а не «0,009333» — меньшую валюту
+// выражаем в большей, как пишут в обменниках.
+function rateTxt(r, req){
+  const a = (nodes.find(n => n.id === req.src) || {}).asset || '';
+  const b = (nodes.find(n => n.id === req.dst) || {}).asset || '';
+  return r >= 1 ? `1 ${esc(a)} = <b>${nf(r, 4)}</b> ${esc(b)}`
+                : `1 ${esc(b)} = <b>${nf(1 / r, 2)}</b> ${esc(a)}`;
 }
 
 function render(d){
@@ -343,9 +517,8 @@ function render(d){
     <div class="result">
       <div class="big">${nf(b.amount_out, b.amount_out<10?4:2)}<span class="unit">${short(req.dst)}</span></div>
       <p class="meta">
-        За ${nf(req.amount,2)} ${short(req.src)} · курс <b>${nf(b.effective_rate, b.effective_rate<1?6:4)}</b>
+        За ${nf(req.amount,2)} ${short(req.src)} · ${rateTxt(b.effective_rate, req)}
         · около <b>${b.eta_min}</b> мин
-        ${b.total_loss_pct!==null?`<br>Вся цепочка съедает <b>${nf(b.total_loss_pct,2)}%</b> относительно прямого курса P2P`:''}
       </p>
     </div>
 
@@ -353,32 +526,41 @@ function render(d){
 
     <div class="ladder">${steps}</div>
 
+    ${(d.wallet_depth||[]).map(sellers).join('')}
+
     ${alts?`<div class="alts"><h2>Другие маршруты</h2>${alts}</div>`:''}
 
     <div class="note ${c.deals?'':'warn'}">${calibLine}</div>
 
-    ${d.missing_quotes.length?`<div class="note warn">Не пришли котировки: ${d.missing_quotes.join(', ')}. Маршруты через них исключены.</div>`:''}
+    ${(d.missing_steps||[]).length?`<div class="note warn">Нет цены на эту сумму: ${d.missing_steps.map(esc).join('; ')}. Стакан не закрывает объём или по способу оплаты нет живых объявлений — маршруты через эти шаги исключены, а не досчитаны.</div>`:''}
 
     <h2>Записать реальный результат</h2>
     <p class="sub" style="margin:2px 0 0">Сколько пришло на самом деле. Каждая запись подтягивает следующие расчёты ближе к факту.</p>
     <div class="fact">
       <input id="actual" type="number" step="any" inputmode="decimal" enterkeyhint="done"
-             autocomplete="off" placeholder="Получено ${short(req.dst)}">
+             autocomplete="off" placeholder="Получено, ${esc((nodes.find(n => n.id === req.dst) || {}).asset || '')}">
       <button id="save">Сохранить</button>
     </div>`;
 
   drawChart();
 
   $('#save').onclick = async () => {
-    const v = parseFloat($('#actual').value);
-    if(!v) return;
-    const r = await fetch(api('api/deals'),{method:'POST',headers:H,body:JSON.stringify({
-      route_key:b.key, pair:`${req.src}>${req.dst}`, amount_in:req.amount,
-      predicted_out:b.amount_out, actual_out:v
-    })});
-    const res = await r.json();
-    $('#save').textContent = `Разошлось на ${res.error_pct>0?'+':''}${res.error_pct}%`;
-    loadStatus();
+    const v = parseFloat(String($('#actual').value).replace(',', '.'));
+    if (!(v > 0)) { $('#actual').focus(); return; }
+    // Одна сделка — одна запись: после сохранения кнопка гаснет до нового
+    // расчёта, иначе второе нажатие засчитало бы сделку дважды.
+    $('#save').disabled = true; $('#actual').disabled = true;
+    try{
+      const res = await getJSON('api/deals', {method:'POST', body:JSON.stringify({
+        route_key:b.key, pair:`${req.src}>${req.dst}`, amount_in:req.amount,
+        predicted_out:b.amount_out, model_out:b.amount_out_raw, actual_out:v
+      })});
+      $('#save').textContent = `Записано · разошлось на ${res.error_pct>0?'+':''}${res.error_pct}%`;
+      loadStatus().catch(() => {});
+    } catch(err){
+      $('#save').disabled = false; $('#actual').disabled = false;
+      showErr(err.message);
+    }
   };
 }
 

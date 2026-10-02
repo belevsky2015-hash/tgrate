@@ -1,9 +1,11 @@
 # ---------------------------------------------------------------------------
 # Граф операций Telegram Wallet.
-# Комиссии сверены с help.ru.wallet.tg (обновление 19.08.2026).
+# Комиссии сверены с help.ru.wallet.tg 27.09.2026 (статья 73 от 23.09,
+# P2P — тариф с 10.08.2026).
 #
 # ${exchange_fee} — 0,9% на Базовом тарифе, 0,09% на Трейдере. Подставляется
-# из WALLET_TIER в .env. ${p2p_fee} — 0,9% если вы мейкер, 0 если тейкер.
+# из WALLET_TIER в .env. ${p2p_fee_rub} и остальные — комиссия мейкера по
+# валюте (RUB 2%, KZT/UAH/USD/EUR/TRY 1,2%), 0 если вы тейкер.
 # ---------------------------------------------------------------------------
 
 nodes:
@@ -30,27 +32,25 @@ nodes:
 edges:
 
   # === P2P Маркет: единственный способ зайти и выйти в фиат без 3,5% ======
-  # Комиссия 0,9% списывается ТОЛЬКО с мейкера. Откликаясь на чужое
-  # объявление, вы тейкер и не платите ничего — но берёте худшую цену.
+  # Комиссия списывается ТОЛЬКО с мейкера (RUB 2%, прочие 1,2%). Откликаясь
+  # на чужое объявление, вы тейкер и не платите ничего — но берёте худшую цену.
 
   - id: p2p.buy.rub
     src: RUB.BANK
     dst: USDT.WALLET
     kind: p2p
     rate: "wallet:USDT/RUB:ask"
-    fee_pct: "${p2p_fee}"
-    spread_pct: 0.25
+    fee_pct: "${p2p_fee_rub}"
     min: 500
     eta_min: 12
-    note: "Покупка USDT за рубли. Цена — VWAP по стакану на вашу сумму."
+    note: "Покупка USDT за рубли. Цена — надёжный продавец на вашу сумму, список ниже."
 
   - id: p2p.sell.rub
     src: USDT.WALLET
     dst: RUB.BANK
     kind: p2p
     rate: "wallet:USDT/RUB:bid"
-    fee_pct: "${p2p_fee}"
-    spread_pct: 0.25
+    fee_pct: "${p2p_fee_rub}"
     min: 5
     eta_min: 12
 
@@ -59,16 +59,14 @@ edges:
     dst: USDT.WALLET
     kind: p2p
     rate: "wallet:USDT/KZT:ask"
-    fee_pct: "${p2p_fee}"
-    spread_pct: 0.35
+    fee_pct: "${p2p_fee_kzt}"
     eta_min: 15
   - id: p2p.sell.kzt
     src: USDT.WALLET
     dst: KZT.BANK
     kind: p2p
     rate: "wallet:USDT/KZT:bid"
-    fee_pct: "${p2p_fee}"
-    spread_pct: 0.35
+    fee_pct: "${p2p_fee_kzt}"
     eta_min: 15
 
   - id: p2p.buy.uah
@@ -76,16 +74,14 @@ edges:
     dst: USDT.WALLET
     kind: p2p
     rate: "wallet:USDT/UAH:ask"
-    fee_pct: "${p2p_fee}"
-    spread_pct: 0.4
+    fee_pct: "${p2p_fee_uah}"
     eta_min: 18
   - id: p2p.sell.uah
     src: USDT.WALLET
     dst: UAH.BANK
     kind: p2p
     rate: "wallet:USDT/UAH:bid"
-    fee_pct: "${p2p_fee}"
-    spread_pct: 0.4
+    fee_pct: "${p2p_fee_uah}"
     eta_min: 18
 
   - id: p2p.buy.usd
@@ -93,16 +89,14 @@ edges:
     dst: USDT.WALLET
     kind: p2p
     rate: "wallet:USDT/USD:ask"
-    fee_pct: "${p2p_fee}"
-    spread_pct: 0.2
+    fee_pct: "${p2p_fee_usd}"
     eta_min: 20
   - id: p2p.sell.usd
     src: USDT.WALLET
     dst: USD.BANK
     kind: p2p
     rate: "wallet:USDT/USD:bid"
-    fee_pct: "${p2p_fee}"
-    spread_pct: 0.2
+    fee_pct: "${p2p_fee_usd}"
     eta_min: 20
 
   - id: p2p.buy.eur
@@ -110,16 +104,14 @@ edges:
     dst: USDT.WALLET
     kind: p2p
     rate: "wallet:USDT/EUR:ask"
-    fee_pct: "${p2p_fee}"
-    spread_pct: 0.25
+    fee_pct: "${p2p_fee_eur}"
     eta_min: 25
   - id: p2p.sell.eur
     src: USDT.WALLET
     dst: EUR.BANK
     kind: p2p
     rate: "wallet:USDT/EUR:bid"
-    fee_pct: "${p2p_fee}"
-    spread_pct: 0.25
+    fee_pct: "${p2p_fee_eur}"
     eta_min: 25
 
   - id: p2p.buy.try
@@ -127,40 +119,43 @@ edges:
     dst: USDT.WALLET
     kind: p2p
     rate: "wallet:USDT/TRY:ask"
-    fee_pct: "${p2p_fee}"
-    spread_pct: 0.35
+    fee_pct: "${p2p_fee_try}"
     eta_min: 20
   - id: p2p.sell.try
     src: USDT.WALLET
     dst: TRY.BANK
     kind: p2p
     rate: "wallet:USDT/TRY:bid"
-    fee_pct: "${p2p_fee}"
-    spread_pct: 0.35
+    fee_pct: "${p2p_fee_try}"
     eta_min: 20
 
   # === Внутренний обмен ====================================================
-  # Курс берётся Кошельком с нескольких бирж. Комиссия по тарифу.
-  # Лимиты: 1,4–25 000 $, пары с BTC от 3,1 $, USDT–GRAM до 100 000 $.
+  # Курс Кошелёк берёт с нескольких бирж; публичного API курса у него нет,
+  # поэтому здесь спот Binance/Bybit — ориентир, а не цена Кошелька.
+  # spread_pct — прикидка его наценки, не проверена. Комиссия по тарифу.
+  # Лимиты в USDT: все пары 1,4–25 000, пары с BTC 3,1–25 000, но USDT–BTC
+  # до 100 000. USDT–GRAM больше не исключение (статья 73 от 23.09.2026).
 
   - id: swap.usdt.gram
     src: USDT.WALLET
     dst: GRAM.WALLET
     kind: swap
-    rate: "cex:TONUSDT:ask_inv"
+    rate: "cex:GRAMUSDT:ask_inv"
     fee_pct: "${exchange_fee}"
     spread_pct: 0.15
     min: 1.4
-    max: 100000
+    max: 25000
     eta_min: 1
+    note: "Курс по споту Binance/Bybit: Кошелёк считает обмен по биржам, свою наценку не публикует. Сверьте с приложением."
   - id: swap.gram.usdt
     src: GRAM.WALLET
     dst: USDT.WALLET
     kind: swap
-    rate: "cex:TONUSDT:bid"
+    rate: "cex:GRAMUSDT:bid"
     fee_pct: "${exchange_fee}"
     spread_pct: 0.15
     eta_min: 1
+    note: "Курс по споту Binance/Bybit: Кошелёк считает обмен по биржам, свою наценку не публикует. Сверьте с приложением."
 
   - id: swap.usdt.btc
     src: USDT.WALLET
@@ -170,8 +165,9 @@ edges:
     fee_pct: "${exchange_fee}"
     spread_pct: 0.2
     min: 3.1
-    max: 25000
+    max: 100000
     eta_min: 1
+    note: "Курс по споту Binance/Bybit: Кошелёк считает обмен по биржам, свою наценку не публикует. Сверьте с приложением."
   - id: swap.btc.usdt
     src: BTC.WALLET
     dst: USDT.WALLET
@@ -180,6 +176,7 @@ edges:
     fee_pct: "${exchange_fee}"
     spread_pct: 0.2
     eta_min: 1
+    note: "Курс по споту Binance/Bybit: Кошелёк считает обмен по биржам, свою наценку не публикует. Сверьте с приложением."
 
   # === Вывод на внешний адрес =============================================
   # Комиссия фиксированная и от суммы не зависит. На 100 $ вывод в TRON
@@ -280,23 +277,6 @@ edges:
     eta_min: 0
     note: "Бесплатно. Если получатель тоже в Wallet — не выводите в сеть."
 
-  # === Карта через платёжного партнёра ====================================
-  # Только как ориентир: почти всегда хуже P2P.
-
-  - id: card.sell.rub
-    src: USDT.WALLET
-    dst: RUB.BANK
-    kind: offramp
-    rate: "fiat:USD/RUB:bid"
-    fee_pct: 3.5
-    eta_min: 30
-    note: "Сторонний провайдер, 3,5%. Доступен не во всех странах."
-  - id: card.buy.rub
-    src: RUB.BANK
-    dst: USDT.WALLET
-    kind: onramp
-    rate: "fiat:USD/RUB:ask"
-    fee_pct: 0.0
-    max: 30000
-    eta_min: 10
-    note: "USDT с карты без комиссии до 300 € на Базовом, 10 000 € на Трейдере."
+  # Покупки и продажи картой (Mercuryo, Alchemy Pay, партнёр 3,5%) в графе
+  # нет: курс провайдера через API не виден, а подставлять курс ЦБ ± 2%
+  # значит выдумывать цифру. Маршрут без настоящей цены — не маршрут.

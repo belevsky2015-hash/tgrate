@@ -5,3 +5,4 @@ __pycache__/
 data/*.sqlite
 *.session
 .pytest_cache/
+.claude/

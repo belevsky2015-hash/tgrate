@@ -35,28 +35,3 @@ class Provider:
                 log.warning("%s недоступен: %s", self.name, exc)
             return self._cache
 
-
-def vwap(levels: list[tuple[float, float]], need: float) -> float | None:
-    """
-    Средневзвешенная цена на объём `need`.
-    levels — [(цена, доступный объём в базовой валюте), ...] уже отсортированы.
-
-    Это главный источник точности: брать лучшую цену из стакана — значит
-    систематически завышать курс на крупных суммах.
-    """
-    if not levels:
-        return None
-    left, cost, got = need, 0.0, 0.0
-    for price, vol in levels:
-        take = min(left, vol)
-        cost += take * price
-        got += take
-        left -= take
-        if left <= 1e-12:
-            break
-    if got <= 0:
-        return None
-    if left > 1e-9:
-        # объёма не хватило — считаем по тому, что есть, но с наценкой
-        return cost / got * 1.01
-    return cost / got

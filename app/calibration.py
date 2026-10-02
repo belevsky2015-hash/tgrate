@@ -32,7 +32,10 @@ class Calibrator:
     реальной операции сюда пишется, сколько предсказали и сколько получили.
 
     Дальше на маршрут и на пару считается взвешенный по свежести коэффициент
-    actual/predicted, и следующий расчёт идёт уже с ним. Через десяток сделок
+    actual/predicted, и следующий расчёт идёт уже с ним. predicted — прогноз
+    МОДЕЛИ, без поправки: поправка применяется к модели, и мерить её надо от
+    модели же. Иначе, как только поправка заработает, новые сделки тянут её
+    обратно к 1 и она раскачивается. Через десяток сделок
     на направление ошибка садится в те самые несколько процентов.
     """
 
@@ -52,6 +55,15 @@ class Calibrator:
         actual_out: float,
         comment: str = "",
     ) -> int:
+        # Повторное нажатие «Сохранить» — та же сделка, а не вторая: дубль
+        # засчитал бы одну сделку дважды и включил поправку раньше времени.
+        same = self.db.execute(
+            "SELECT id FROM deals WHERE route_key=? AND pair=? AND amount_in=? "
+            "AND actual_out=? AND ts > ? ORDER BY ts DESC LIMIT 1",
+            (route_key, pair, amount_in, actual_out, time.time() - 120),
+        ).fetchone()
+        if same:
+            return same["id"]
         cur = self.db.execute(
             "INSERT INTO deals(ts, route_key, pair, amount_in, predicted_out,"
             " actual_out, comment) VALUES (?,?,?,?,?,?,?)",

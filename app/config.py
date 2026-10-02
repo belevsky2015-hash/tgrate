@@ -59,6 +59,13 @@ class Settings:
 
     safety_pct = _f("SAFETY_PCT", 0.0)                # общий запас сверху
 
+    # Маршруты, которые фоновый цикл раз в минуту считает точно на заданную
+    # сумму — для честного графика. "USDT.WALLET>RUB.BANK:1000,RUB.BANK>KZT.BANK:50000"
+    track_routes = [
+        (r.split(">")[0], r.split(">")[1].split(":")[0], float(r.split(":")[1]))
+        for r in os.getenv("TRACK_ROUTES", "").replace(" ", "").split(",") if r
+    ]
+
     # Telegram
     api_id = int(os.getenv("TG_API_ID", 0) or 0)
     api_hash = os.getenv("TG_API_HASH", "")

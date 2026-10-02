@@ -24,7 +24,7 @@ import httpx
 
 from app.config import settings
 from app.graph import bind_rates, k_best_routes, load_graph
-from app.wallet import WalletP2P, exchange_fee, p2p_fee
+from app.wallet import WalletP2P, fee_vars
 
 OK, BAD, WARN = "  ok  ", " ОШИБКА ", " ! "
 
@@ -82,27 +82,32 @@ async def check_wallet() -> bool:
 
     q = await _quote_sample(w)
     if q:
-        line(OK, f"VWAP на 1000 USDT: {q['price']:.4f} RUB "
+        line(OK, f"Покупка 1000 USDT: {q['price']:.4f} RUB, {q['basis']} "
                  f"(лучшая строка {q['best_price']:.4f}, "
-                 f"проскальзывание {q['slippage_pct']:.2f}%, "
-                 f"объявлений задействовано {q['ads_used']})")
+                 f"сделок {q['ads_used']}, надёжных на всю сумму {len(q['top'])})")
     return True
 
 
-async def _quote_sample(w: WalletP2P):
+async def _quote_sample(_: WalletP2P):
+    # фильтры как у панели: w выше собран без порога ради проверки side
+    w = WalletP2P(
+        settings.wallet_api_key,
+        side_when_we_buy=settings.wallet_side_buy,
+        min_execute_rate=settings.wallet_min_execute_rate,
+        merchants_only=settings.wallet_merchants_only,
+        payments=settings.wallet_payments,
+    )
     async with httpx.AsyncClient() as c:
         return await w.quote(c, "USDT", "RUB", "buy", 1000)
 
 
 def check_graph() -> bool:
-    variables = {
-        "exchange_fee": exchange_fee(settings.wallet_tier),
-        "p2p_fee": p2p_fee(settings.wallet_role),
-    }
+    variables = fee_vars(settings.wallet_tier, settings.wallet_role)
     nodes, edges = load_graph(settings.fees_path, variables)
     line(OK, f"Граф загружен: {len(nodes)} узлов, {len(edges)} операций")
     print(f"      тариф {settings.wallet_tier}: обмен {variables['exchange_fee']}%, "
-          f"роль {settings.wallet_role}: P2P {variables['p2p_fee']}%")
+          f"роль {settings.wallet_role}: P2P RUB {variables['p2p_fee_rub']}%, "
+          f"KZT {variables['p2p_fee_kzt']}%")
 
     unknown = {e.src for e in edges} | {e.dst for e in edges}
     orphan = unknown - set(nodes)
@@ -112,9 +117,8 @@ def check_graph() -> bool:
 
     fake = {
         "wallet:USDT/RUB:ask": 1 / 78.5, "wallet:USDT/RUB:bid": 77.2,
-        "cex:TONUSDT:bid": 2.1, "cex:TONUSDT:ask_inv": 1 / 2.12,
+        "cex:GRAMUSDT:bid": 2.1, "cex:GRAMUSDT:ask_inv": 1 / 2.12,
         "cex:BTCUSDT:bid": 95000, "cex:BTCUSDT:ask_inv": 1 / 95100,
-        "fiat:USD/RUB:bid": 79.0, "fiat:USD/RUB:ask": 1 / 81.0,
     }
     bind_rates(edges, fake)
     r = k_best_routes(edges, "RUB.BANK", "USDT.TRC20", 10000, k=1)

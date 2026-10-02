@@ -70,10 +70,11 @@ def fmt_quote(data: dict) -> str:
     req = data["request"]
     lines = [
         f"{req['amount']:,.2f} {req['src']} → {b['amount_out']:,.2f} {req['dst']}",
-        f"Курс {b['effective_rate']:.6f} · примерно {b['eta_min']} мин",
+        (f"Курс: 1 {req['src'].split('.')[0]} = {b['effective_rate']:,.4f} {req['dst'].split('.')[0]}"
+         if b["effective_rate"] >= 1 else
+         f"Курс: 1 {req['dst'].split('.')[0]} = {1 / b['effective_rate']:,.2f} {req['src'].split('.')[0]}")
+        + f" · примерно {b['eta_min']} мин",
     ]
-    if b["total_loss_pct"] is not None:
-        lines.append(f"Схема съедает {b['total_loss_pct']:.2f}% от прямого курса")
     c = b["calibration"]
     lines.append(
         f"Поправка {c['factor']:.3f} ({c['basis']}, сделок: {c['deals']})"
@@ -85,12 +86,24 @@ def fmt_quote(data: dict) -> str:
             f"{i}. {s['from']} → {s['to']}: "
             f"{s['in']:,.4f} → {s['out']:,.4f} (−{s['loss_pct']:.2f}%)"
         )
+    for leg in data.get("wallet_depth") or []:
+        who = "Продают" if leg["direction"] == "buy" else "Покупают"
+        lines.append(f"\n{who} USDT за {leg['fiat']} ({leg['basis']}):")
+        for i, t in enumerate(leg["top"], 1):
+            lines.append(
+                f"{i}. {t['nickname']} — {t['price']:,.{4 if t['price'] < 10 else 2}f}, "
+                f"{t['execute_rate']:.0%}, {t['orders']} сделок, "
+                f"{t['min_fiat']:,.0f}–{t['max_fiat']:,.0f}"
+                + (", авто" if t["auto_accept"] else "")
+            )
+        if not leg["top"]:
+            lines.append(f"надёжного на всю сумму нет, сделок: {leg['ads_used']}")
     if data.get("alternatives"):
         alt = data["alternatives"][0]
         delta = (alt["amount_out"] / b["amount_out"] - 1) * 100
         lines.append(f"\nСледующий вариант хуже на {abs(delta):.2f}%")
     if data.get("missing_quotes"):
-        lines.append(f"\nНет котировок: {', '.join(data['missing_quotes'][:4])}")
+        lines.append(f"\nНет цены на эту сумму: {', '.join(data['missing_quotes'][:4])}")
     lines.append(f"\nКлюч маршрута: {b['key']}")
     return "\n".join(lines)
 
@@ -136,7 +149,8 @@ def build() -> TelegramClient:
         s = await api_get("/api/status")
         acc = s["accuracy"]
         vs = "\n".join(
-            f"  {r['fiat']}: Wallet {r['wallet']} против Binance {r['binance']}"
+            f"  {r['fiat']} {'покупка' if r['side'] == 'buy' else 'продажа'}: "
+            f"Wallet {r['wallet']} против Binance {r['binance']}"
             f" ({r['diff_pct']:+.2f}%)" for r in s["wallet_vs_market"]
         )
         await e.reply(
